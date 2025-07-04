@@ -13,7 +13,6 @@ Firefly is a CLI tool for detecting configuration drift in AWS EC2 instances. It
 2.  **Installation:**
     ```bash
     git clone https://github.com/your-repo/firefly-task.git
-    cd firefly-task/impl
     go build -o firefly
     ```
 
