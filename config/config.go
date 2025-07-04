@@ -150,3 +150,22 @@ func (c *Config) String() string {
 	
 	return strings.Join(parts, ", ")
 }
+
+// ReadInstanceIDs reads instance IDs from a file
+func ReadInstanceIDs(filePath string) ([]string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read instance ids file: %w", err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var ids []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			ids = append(ids, line)
+		}
+	}
+
+	return ids, nil
+}

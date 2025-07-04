@@ -9,7 +9,7 @@
       "low": 1,
       "medium": 1
     },
-    "generation_time": "2025-07-04T12:55:23+01:00",
+    "generation_time": "2025-07-04T13:29:02+01:00",
     "overall_status": "DRIFT_DETECTED",
     "highest_severity": "critical"
   },
@@ -23,7 +23,7 @@
       "drifted_attributes": [],
       "differences": [],
       "checked_attributes": [],
-      "timestamp": "2025-07-04T12:55:23.298213+01:00",
+      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
       "overall_severity": 1
     },
     "aws_instance.web-server-1": {
@@ -46,7 +46,7 @@
         }
       ],
       "checked_attributes": [],
-      "timestamp": "2025-07-04T12:55:23.298213+01:00",
+      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
       "overall_severity": 2
     },
     "aws_instance.web-server-2": {
@@ -69,7 +69,7 @@
         }
       ],
       "checked_attributes": [],
-      "timestamp": "2025-07-04T12:55:23.298213+01:00",
+      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
       "overall_severity": 4
     },
     "aws_lb.main": {
@@ -92,7 +92,7 @@
         }
       ],
       "checked_attributes": [],
-      "timestamp": "2025-07-04T12:55:23.298213+01:00",
+      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
       "overall_severity": 3
     }
   },
@@ -100,5 +100,5 @@
     "generator_version": "1.0.0",
     "report_format": "standard"
   },
-  "timestamp": "2025-07-04T12:55:23+01:00"
+  "timestamp": "2025-07-04T13:29:02+01:00"
 }

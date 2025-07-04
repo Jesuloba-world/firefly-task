@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
-
+	"firefly-task/aws"
 	"firefly-task/config"
+	"firefly-task/drift"
 	"firefly-task/errors"
 	"firefly-task/logging"
+	"firefly-task/report"
+	"firefly-task/terraform"
+	"github.com/spf13/cobra"
 )
 
 var cfg config.Config
@@ -53,8 +56,60 @@ defined in Terraform files.`,
 		}
 
 		logger.Infof("Starting drift check for instance: %s", cfg.InstanceID)
-		// TODO: Implement drift detection logic
-		return fmt.Errorf("drift detection functionality not yet implemented")
+
+		// Initialize AWS client
+		awsClient, err := aws.NewClient(cmd.Context(), aws.ClientConfig{Profile: cfg.AWSProfile, Region: cfg.AWSRegion})
+		if err != nil {
+			return fmt.Errorf("failed to create aws client: %w", err)
+		}
+
+		// Get actual instance state from AWS
+		actualInstance, err := awsClient.GetEC2Instance(cmd.Context(), cfg.InstanceID)
+		if err != nil {
+			return fmt.Errorf("failed to get ec2 instance: %w", err)
+		}
+
+		// Parse Terraform configuration to get expected state
+		tfParser := terraform.NewParser()
+		expectedInstances, err := tfParser.ParseHCL(cfg.TerraformPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse terraform file: %w", err)
+		}
+
+		// Find the expected instance configuration
+		var expectedInstance *terraform.TerraformConfig
+		for _, inst := range expectedInstances {
+			if inst.InstanceID == cfg.InstanceID {
+				expectedInstance = inst
+				break
+			}
+		}
+
+		if expectedInstance == nil {
+			return fmt.Errorf("instance %s not found in terraform file", cfg.InstanceID)
+		}
+
+		// Detect drift
+		driftDetector := drift.NewDriftDetector(drift.DefaultDetectionConfig())
+		driftResult, err := driftDetector.DetectDrift(actualInstance, expectedInstance)
+		if err != nil {
+			return fmt.Errorf("failed to detect drift: %w", err)
+		}
+
+		// Generate and print report
+		reportGenerator, err := report.NewReportGenerator(report.ConsoleGenerator)
+		if err != nil {
+			return fmt.Errorf("failed to create report generator: %w", err)
+		}
+
+		reportData, err := reportGenerator.GenerateConsoleReport(map[string]*drift.DriftResult{cfg.InstanceID: driftResult})
+		if err != nil {
+			return fmt.Errorf("failed to generate report: %w", err)
+		}
+
+		fmt.Println(reportData)
+
+		return nil
 	},
 }
 
@@ -76,8 +131,71 @@ concurrently for improved performance.`,
 		}
 
 		logger.Infof("Starting batch drift check from file: %s", cfg.InputFile)
-		// TODO: Implement batch drift detection logic
-		return fmt.Errorf("batch drift detection functionality not yet implemented")
+
+		// Read instance IDs from input file
+		instanceIDs, err := config.ReadInstanceIDs(cfg.InputFile)
+		if err != nil {
+			return fmt.Errorf("failed to read instance ids from file: %w", err)
+		}
+
+		// Initialize AWS client
+		awsClient, err := aws.NewClient(cmd.Context(), aws.ClientConfig{Profile: cfg.AWSProfile, Region: cfg.AWSRegion})
+		if err != nil {
+			return fmt.Errorf("failed to create aws client: %w", err)
+		}
+
+		// Get actual instance states from AWS
+		actualInstances, err := awsClient.GetMultipleEC2Instances(cmd.Context(), instanceIDs)
+		if err != nil {
+			return fmt.Errorf("failed to get ec2 instances: %w", err)
+		}
+
+		// Parse Terraform configuration to get expected state
+		tfParser := terraform.NewParser()
+		expectedInstances, err := tfParser.ParseHCL(cfg.TerraformPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse terraform file: %w", err)
+		}
+
+		// Detect drift for all instances
+		driftDetector := drift.NewDriftDetector(drift.DefaultDetectionConfig())
+		driftResults := make(map[string]*drift.DriftResult)
+
+		for _, id := range instanceIDs {
+			actual, ok := actualInstances[id]
+			if !ok {
+				logger.Warnf("instance %s not found in aws", id)
+				continue
+			}
+
+			expected, ok := expectedInstances[id]
+			if !ok {
+				logger.Warnf("instance %s not found in terraform file", id)
+				continue
+			}
+
+			result, err := driftDetector.DetectDrift(actual, expected)
+			if err != nil {
+				logger.Errorf("failed to detect drift for instance %s: %v", id, err)
+				continue
+			}
+			driftResults[id] = result
+		}
+
+		// Generate and print report
+		reportGenerator, err := report.NewReportGenerator(report.ConsoleGenerator)
+		if err != nil {
+			return fmt.Errorf("failed to create report generator: %w", err)
+		}
+
+		reportData, err := reportGenerator.GenerateConsoleReport(driftResults)
+		if err != nil {
+			return fmt.Errorf("failed to generate report: %w", err)
+		}
+
+		fmt.Println(reportData)
+
+		return nil
 	},
 }
 
@@ -99,8 +217,67 @@ aspects like security groups, instance type, or tags.`,
 		}
 
 		logger.Infof("Starting attribute drift check for: %s", cfg.Attribute)
-		// TODO: Implement attribute drift detection logic
-		return fmt.Errorf("attribute drift detection functionality not yet implemented")
+
+		// Initialize AWS client
+		awsClient, err := aws.NewClient(cmd.Context(), aws.ClientConfig{Profile: cfg.AWSProfile, Region: cfg.AWSRegion})
+		if err != nil {
+			return fmt.Errorf("failed to create aws client: %w", err)
+		}
+
+		// Get actual instance state from AWS
+		actualInstance, err := awsClient.GetEC2Instance(cmd.Context(), cfg.InstanceID)
+		if err != nil {
+			return fmt.Errorf("failed to get ec2 instance: %w", err)
+		}
+
+		// Parse Terraform configuration to get expected state
+		tfParser := terraform.NewParser()
+		expectedInstances, err := tfParser.ParseHCL(cfg.TerraformPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse terraform file: %w", err)
+		}
+
+		// Find the expected instance configuration
+		var expectedInstance *terraform.TerraformConfig
+		for _, inst := range expectedInstances {
+			if inst.InstanceID == cfg.InstanceID {
+				expectedInstance = inst
+				break
+			}
+		}
+
+		if expectedInstance == nil {
+			return fmt.Errorf("instance %s not found in terraform file", cfg.InstanceID)
+		}
+
+		// Configure drift detection for a single attribute
+		driftConfig := drift.DefaultDetectionConfig()
+		driftConfig.AttributeConfigs = map[string]drift.AttributeConfig{
+			cfg.Attribute: {ComparisonType: drift.ExactMatch, CaseSensitive: true},
+		}
+		driftConfig.IgnoredAttributes = []string{}
+
+		// Detect drift
+		driftDetector := drift.NewDriftDetector(driftConfig)
+		driftResult, err := driftDetector.DetectDrift(actualInstance, expectedInstance)
+		if err != nil {
+			return fmt.Errorf("failed to detect drift: %w", err)
+		}
+
+		// Generate and print report
+		reportGenerator, err := report.NewReportGenerator(report.ConsoleGenerator)
+		if err != nil {
+			return fmt.Errorf("failed to create report generator: %w", err)
+		}
+
+		reportData, err := reportGenerator.GenerateConsoleReport(map[string]*drift.DriftResult{cfg.InstanceID: driftResult})
+		if err != nil {
+			return fmt.Errorf("failed to generate report: %w", err)
+		}
+
+		fmt.Println(reportData)
+
+		return nil
 	},
 }
 

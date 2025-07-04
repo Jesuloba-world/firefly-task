@@ -35,7 +35,7 @@ func (c *Client) GetEC2Instance(ctx context.Context, instanceID string) (*EC2Ins
 
 	// Call the AWS API with retry logic
 	var resp *ec2.DescribeInstancesOutput
-	err := c.retryWithBackoff(ctx, func() error {
+	err := c.retryWithBackoff(ctx, func(ctx context.Context) error {
 		var err error
 		resp, err = c.ec2.DescribeInstances(ctx, input)
 		return err
@@ -63,16 +63,21 @@ func (c *Client) GetEC2Instance(ctx context.Context, instanceID string) (*EC2Ins
 }
 
 // retryWithBackoff implements exponential backoff retry logic
-func (c *Client) retryWithBackoff(ctx context.Context, operation func() error) error {
+func (c *Client) retryWithBackoff(ctx context.Context, operation func(ctx context.Context) error) error {
 	const (
-		maxRetries = 3
-		baseDelay  = 100 * time.Millisecond
-		maxDelay   = 5 * time.Second
+		maxRetries     = 3
+		baseDelay      = 100 * time.Millisecond
+		maxDelay       = 5 * time.Second
+		requestTimeout = 10 * time.Second // Add a request timeout
 	)
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		// Check if context is cancelled
+		// Create a new context with a timeout for each attempt
+		attemptCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+		defer cancel()
+
+		// Check if the parent context is cancelled
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -80,7 +85,7 @@ func (c *Client) retryWithBackoff(ctx context.Context, operation func() error) e
 		}
 
 		// Execute the operation
-		err := operation()
+		err := operation(attemptCtx)
 		if err == nil {
 			return nil // Success
 		}
@@ -123,31 +128,25 @@ func isRetryableError(err error) bool {
 		return false
 	}
 
+	// Check for context deadline exceeded, which is retryable
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
 	errorStr := err.Error()
-
-	// AWS throttling errors
-	if strings.Contains(errorStr, ErrorPatternThrottling) ||
-		strings.Contains(errorStr, ErrorPatternRequestLimitExceeded) ||
-		strings.Contains(errorStr, ErrorPatternServiceUnavailable) ||
-		strings.Contains(errorStr, ErrorPatternInternalError) {
-		return true
-	}
-
-	// Network-related errors
-	if strings.Contains(errorStr, ErrorPatternConnectionReset) ||
-		strings.Contains(errorStr, ErrorPatternTimeout) ||
-		strings.Contains(errorStr, ErrorPatternTemporaryFailure) {
-		return true
-	}
 
 	// Don't retry client errors like InvalidInstanceID.NotFound
 	if strings.Contains(errorStr, ErrorPatternInvalidInstanceID) ||
 		strings.Contains(errorStr, ErrorPatternInvalidParameter) ||
-		strings.Contains(errorStr, ErrorPatternUnauthorizedOperation) {
+		strings.Contains(errorStr, ErrorPatternUnauthorizedOperation) ||
+		strings.Contains(errorStr, ErrorPatternInstanceNotFound) {
 		return false
 	}
 
-	return false
+	// For most other errors, especially network-related ones, retrying is safe.
+	// This includes throttling errors, service unavailable, internal errors,
+	// and common network issues.
+	return true
 }
 
 // GetMultipleEC2Instances retrieves multiple EC2 instances by their IDs with retry logic
@@ -165,7 +164,7 @@ func (c *Client) GetMultipleEC2Instances(ctx context.Context, instanceIDs []stri
 
 	// Call the AWS API with retry logic
 	var resp *ec2.DescribeInstancesOutput
-	err := c.retryWithBackoff(ctx, func() error {
+	err := c.retryWithBackoff(ctx, func(ctx context.Context) error {
 		var err error
 		resp, err = c.ec2.DescribeInstances(ctx, input)
 		return err
