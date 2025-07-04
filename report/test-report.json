@@ -1,7 +1,7 @@
 {
   "summary": {
-    "total_resources": 3,
-    "resources_with_drift": 2,
+    "total_resources": 4,
+    "resources_with_drift": 3,
     "total_differences": 3,
     "severity_counts": {
       "critical": 1,
@@ -9,15 +9,73 @@
       "low": 1,
       "medium": 1
     },
-    "generation_time": "2025-07-04T12:20:01+01:00",
+    "generation_time": "2025-07-04T12:55:23+01:00",
     "overall_status": "DRIFT_DETECTED",
     "highest_severity": "critical"
   },
   "results": {
-    "aws_instance.database": {
-      "resource_id": "aws_instance.database",
+    "aws_db_instance.database": {
+      "resource_id": "aws_db_instance.database",
+      "instance_id": "i-fedcba9876543210",
+      "resource_type": "aws_db_instance",
+      "detection_time": "0001-01-01T00:00:00Z",
+      "has_drift": false,
+      "drifted_attributes": [],
+      "differences": [],
+      "checked_attributes": [],
+      "timestamp": "2025-07-04T12:55:23.298213+01:00",
+      "overall_severity": 1
+    },
+    "aws_instance.web-server-1": {
+      "resource_id": "aws_instance.web-server-1",
+      "instance_id": "i-1234567890abcdef0",
+      "resource_type": "aws_instance",
+      "detection_time": "0001-01-01T00:00:00Z",
+      "has_drift": true,
+      "drifted_attributes": [
+        "instance_type"
+      ],
+      "differences": [
+        {
+          "attribute_name": "instance_type",
+          "actual_value": "t2.small",
+          "expected_value": "t2.micro",
+          "difference_type": "",
+          "description": "",
+          "severity": 2
+        }
+      ],
+      "checked_attributes": [],
+      "timestamp": "2025-07-04T12:55:23.298213+01:00",
+      "overall_severity": 2
+    },
+    "aws_instance.web-server-2": {
+      "resource_id": "aws_instance.web-server-2",
       "instance_id": "i-abcdef1234567890",
-      "resource_type": "",
+      "resource_type": "aws_instance",
+      "detection_time": "0001-01-01T00:00:00Z",
+      "has_drift": true,
+      "drifted_attributes": [
+        "security_groups"
+      ],
+      "differences": [
+        {
+          "attribute_name": "security_groups",
+          "actual_value": "sg-5678",
+          "expected_value": "sg-1234",
+          "difference_type": "",
+          "description": "",
+          "severity": 4
+        }
+      ],
+      "checked_attributes": [],
+      "timestamp": "2025-07-04T12:55:23.298213+01:00",
+      "overall_severity": 4
+    },
+    "aws_lb.main": {
+      "resource_id": "aws_lb.main",
+      "instance_id": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+      "resource_type": "aws_lb",
       "detection_time": "0001-01-01T00:00:00Z",
       "has_drift": true,
       "drifted_attributes": [
@@ -26,96 +84,21 @@
       "differences": [
         {
           "attribute_name": "publicly_accessible",
-          "actual_value": true,
-          "expected_value": false,
+          "actual_value": "false",
+          "expected_value": "true",
           "difference_type": "",
-          "description": "Database is publicly accessible",
-          "severity": 4
-        }
-      ],
-      "checked_attributes": [],
-      "timestamp": "2025-07-04T12:20:01.1653765+01:00",
-      "overall_severity": 4
-    },
-    "aws_instance.web-server-1": {
-      "resource_id": "aws_instance.web-server-1",
-      "instance_id": "i-1234567890abcdef0",
-      "resource_type": "",
-      "detection_time": "0001-01-01T00:00:00Z",
-      "has_drift": true,
-      "drifted_attributes": [
-        "instance_type",
-        "security_groups"
-      ],
-      "differences": [
-        {
-          "attribute_name": "instance_type",
-          "actual_value": "t3.small",
-          "expected_value": "t3.micro",
-          "difference_type": "",
-          "description": "Instance type mismatch",
-          "severity": 2
-        },
-        {
-          "attribute_name": "security_groups",
-          "actual_value": [
-            "sg-12345",
-            "sg-67890"
-          ],
-          "expected_value": [
-            "sg-12345"
-          ],
-          "difference_type": "",
-          "description": "Additional security group attached",
+          "description": "",
           "severity": 3
         }
       ],
       "checked_attributes": [],
-      "timestamp": "2025-07-04T12:20:01.1653765+01:00",
+      "timestamp": "2025-07-04T12:55:23.298213+01:00",
       "overall_severity": 3
-    },
-    "aws_instance.web-server-2": {
-      "resource_id": "aws_instance.web-server-2",
-      "instance_id": "i-0987654321fedcba0",
-      "resource_type": "",
-      "detection_time": "0001-01-01T00:00:00Z",
-      "has_drift": false,
-      "drifted_attributes": [],
-      "differences": [],
-      "checked_attributes": [],
-      "timestamp": "2025-07-04T12:20:01.1653765+01:00",
-      "overall_severity": 1
     }
   },
-  "recommendations": [
-    {
-      "resource_id": "aws_instance.database",
-      "severity": 4,
-      "title": "Address publicly_accessible drift in aws_instance.database",
-      "description": "The publicly_accessible attribute has drifted from expected value 'false' to 'true'",
-      "action": "IMMEDIATE ACTION REQUIRED: Update Terraform configuration and apply changes",
-      "priority": 3
-    },
-    {
-      "resource_id": "aws_instance.web-server-1",
-      "severity": 3,
-      "title": "Address security_groups drift in aws_instance.web-server-1",
-      "description": "The security_groups attribute has drifted from expected value '[sg-12345]' to '[sg-12345 sg-67890]'",
-      "action": "Update Terraform configuration to match actual state or revert AWS changes",
-      "priority": 2
-    },
-    {
-      "resource_id": "aws_instance.web-server-1",
-      "severity": 2,
-      "title": "Address instance_type drift in aws_instance.web-server-1",
-      "description": "The instance_type attribute has drifted from expected value 't3.micro' to 't3.small'",
-      "action": "Review and align Terraform configuration with actual AWS state",
-      "priority": 1
-    }
-  ],
   "metadata": {
     "generator_version": "1.0.0",
     "report_format": "standard"
   },
-  "timestamp": "2025-07-04T12:20:01+01:00"
+  "timestamp": "2025-07-04T12:55:23+01:00"
 }

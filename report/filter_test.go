@@ -64,7 +64,7 @@ func TestResultFilter_Apply(t *testing.T) {
 	// Test no filter (should return all results)
 	filter := NewResultFilter()
 	filtered := filter.Apply(results)
-	assert.Len(t, filtered, 3)
+	assert.Len(t, filtered, 4)
 
 	// Test severity filter
 	filter = NewResultFilter().WithSeverity(drift.SeverityHigh, drift.SeverityCritical)
@@ -74,7 +74,7 @@ func TestResultFilter_Apply(t *testing.T) {
 	// Test drift status filter
 	filter = NewResultFilter().OnlyWithDrift()
 	filtered = filter.Apply(results)
-	assert.Len(t, filtered, 2) // Only resources with drift
+	assert.Len(t, filtered, 3) // Only resources with drift
 
 	// Test no drift filter
 	filter = NewResultFilter().OnlyWithoutDrift()
@@ -139,7 +139,7 @@ func TestResultFilter_ApplyWithTimeRange(t *testing.T) {
 	// Test time range filter (all results should be within range)
 	filter := NewResultFilter().WithTimeRange(&yesterday, &tomorrow)
 	filtered := filter.Apply(results)
-	assert.Len(t, filtered, 3) // All results should be within range
+	assert.Len(t, filtered, 4) // All results should be within range
 
 	// Test restrictive time range (no results should match)
 	futureStart := tomorrow
@@ -160,12 +160,12 @@ func TestResultFilter_ApplyWithLimit(t *testing.T) {
 	// Test limit larger than available results
 	filter = NewResultFilter().WithLimit(10, 0)
 	filtered = filter.Apply(results)
-	assert.Len(t, filtered, 3) // Should return all available results
+	assert.Len(t, filtered, 4) // Should return all available results
 
 	// Test zero limit (should return all)
 	filter = NewResultFilter().WithLimit(0, 0)
 	filtered = filter.Apply(results)
-	assert.Len(t, filtered, 3)
+	assert.Len(t, filtered, 4)
 }
 
 func TestResultFilter_ApplyWithSorting(t *testing.T) {
@@ -174,25 +174,17 @@ func TestResultFilter_ApplyWithSorting(t *testing.T) {
 	// Test sort by resource ID (ascending)
 	filter := NewResultFilter().WithSort(SortByResourceID, SortOrderAsc)
 	filtered := filter.Apply(results)
-	assert.Len(t, filtered, 3)
+	assert.Len(t, filtered, 4)
 
 	// Verify sorting order
-	resourceIDs := make([]string, len(filtered))
-	i := 0
-	for id := range filtered {
-		resourceIDs[i] = id
-		i++
-	}
-
-	// Check if sorted (basic check)
-	for i := 1; i < len(resourceIDs); i++ {
-		assert.LessOrEqual(t, resourceIDs[i-1], resourceIDs[i])
+	for i := 1; i < len(filtered); i++ {
+		assert.LessOrEqual(t, filtered[i-1].ResourceID, filtered[i].ResourceID)
 	}
 
 	// Test sort by severity (descending)
 	filter = NewResultFilter().WithSort(SortBySeverity, SortOrderDesc)
 	filtered = filter.Apply(results)
-	assert.Len(t, filtered, 3)
+	assert.Len(t, filtered, 4)
 }
 
 func TestResultFilter_CombinedFilters(t *testing.T) {
@@ -209,12 +201,12 @@ func TestResultFilter_CombinedFilters(t *testing.T) {
 	assert.LessOrEqual(t, len(filtered), 1) // Should respect limit
 
 	// Verify all filters are applied
-	for resourceID, result := range filtered {
+	for _, result := range filtered {
 		// Check resource pattern
-		assert.Contains(t, resourceID, "web-server")
+		assert.Contains(t, result.ResourceID, "web-server")
 
 		// Check drift status
-		assert.Greater(t, result.GetDriftedCount(), 0)
+		assert.True(t, result.HasDrift)
 
 		// Check severity
 		assert.GreaterOrEqual(t, int(result.GetHighestSeverity()), int(drift.SeverityMedium))
@@ -225,7 +217,7 @@ func TestResultFilter_ErrorHandling(t *testing.T) {
 	// Test with nil results
 	filter := NewResultFilter()
 	filtered := filter.Apply(nil)
-	assert.Len(t, filtered, 0) // Should return empty map, not error
+	assert.Nil(t, filtered) // Should return nil, not error
 
 	// Test with empty results
 	results := make(map[string]*drift.DriftResult)
@@ -382,5 +374,3 @@ func BenchmarkResultFilter_ApplyWithSorting(b *testing.B) {
 		_ = filter.Apply(results)
 	}
 }
-
-// Note: createLargeDriftResults function is defined in recommendations_test.go to avoid duplication

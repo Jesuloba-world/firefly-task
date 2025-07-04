@@ -214,12 +214,12 @@ func (srg *StandardReportGenerator) WriteToFile(content []byte, filePath string)
 // buildReportData creates the complete report data structure
 func (srg *StandardReportGenerator) buildReportData(results map[string]*drift.DriftResult) *ReportData {
 	summary := srg.generateSummary(results)
-	recommendations := srg.generateRecommendations(results)
+
 
 	reportData := &ReportData{
 		Summary:         summary,
 		Results:         results,
-		Recommendations: recommendations,
+
 		Metadata: map[string]interface{}{
 			"generator_version": "1.0.0",
 			"report_format":     "standard",
@@ -280,57 +280,9 @@ func (srg *StandardReportGenerator) generateSummary(results map[string]*drift.Dr
 	}
 }
 
-// generateRecommendations creates actionable recommendations based on drift results
-func (srg *StandardReportGenerator) generateRecommendations(results map[string]*drift.DriftResult) []Recommendation {
-	var recommendations []Recommendation
-	priority := 1
 
-	for _, result := range results {
-		if !result.HasDrift {
-			continue
-		}
 
-		// Generate recommendations based on severity and type of drift
-		for _, diff := range result.Differences {
-			recommendation := Recommendation{
-				ResourceID:  result.ResourceID,
-				Severity:    diff.Severity,
-				Title:       fmt.Sprintf("Address %s drift in %s", diff.AttributeName, result.ResourceID),
-				Description: fmt.Sprintf("The %s attribute has drifted from expected value '%v' to '%v'", diff.AttributeName, diff.ExpectedValue, diff.ActualValue),
-				Action:      srg.generateActionRecommendation(diff),
-				Priority:    priority,
-			}
-			recommendations = append(recommendations, recommendation)
-			priority++
-		}
-	}
 
-	// Sort recommendations by severity (highest first) then by priority
-	sort.Slice(recommendations, func(i, j int) bool {
-		if recommendations[i].Severity != recommendations[j].Severity {
-			return recommendations[i].Severity > recommendations[j].Severity
-		}
-		return recommendations[i].Priority < recommendations[j].Priority
-	})
-
-	return recommendations
-}
-
-// generateActionRecommendation generates specific action recommendations based on the difference
-func (srg *StandardReportGenerator) generateActionRecommendation(diff drift.AttributeDifference) string {
-	switch diff.Severity {
-	case drift.SeverityCritical:
-		return "IMMEDIATE ACTION REQUIRED: Update Terraform configuration and apply changes"
-	case drift.SeverityHigh:
-		return "Update Terraform configuration to match actual state or revert AWS changes"
-	case drift.SeverityMedium:
-		return "Review and align Terraform configuration with actual AWS state"
-	case drift.SeverityLow:
-		return "Consider updating Terraform configuration during next maintenance window"
-	default:
-		return "Review configuration alignment"
-	}
-}
 
 // filterResults filters results based on minimum severity level
 func (srg *StandardReportGenerator) filterResults(results map[string]*drift.DriftResult, minSeverity drift.DriftSeverity) (map[string]*drift.DriftResult, error) {

@@ -476,8 +476,6 @@ func TestCIReportGenerator_NilData(t *testing.T) {
 	_, err = generator.WriteArtifacts(nil)
 	assert.Error(t, err)
 
-
-
 	err = generator.SetPlatformSpecificVariables(nil)
 	assert.Error(t, err)
 }

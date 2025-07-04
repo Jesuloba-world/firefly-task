@@ -171,8 +171,7 @@ func (crg *ConsoleReportGenerator) GenerateConsoleReport(results map[string]*dri
 	// Results by severity
 	builder.WriteString(crg.generateResultsBySeverity(results))
 
-	// Recommendations
-	builder.WriteString(crg.generateColoredRecommendations(results))
+
 
 	return builder.String(), nil
 }
@@ -218,9 +217,9 @@ func (crg *ConsoleReportGenerator) generateHeader() string {
 	var builder strings.Builder
 
 	headerText := `
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                           DRIFT DETECTION REPORT                            ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+================================================================================
+                           DRIFT DETECTION REPORT
+================================================================================
 `
 	builder.WriteString(crg.colorize(headerText, ColorCyan+ColorBold))
 	builder.WriteString(crg.colorize(fmt.Sprintf("Generated: %s\n", time.Now().Format("2006-01-02 15:04:05 MST")), ColorDim))
@@ -280,6 +279,15 @@ func (crg *ConsoleReportGenerator) generateSummarySection(results map[string]*dr
 
 // generateColoredSummary creates a summary with color coding
 func (crg *ConsoleReportGenerator) generateColoredSummary(results map[string]*drift.DriftResult) string {
+	if len(results) == 0 {
+		var builder strings.Builder
+		builder.WriteString(crg.colorize("\n📊 SUMMARY:\n", ColorBold+ColorWhite))
+		builder.WriteString(fmt.Sprintf("   Total Resources: %s\n", crg.colorize("0", ColorCyan)))
+		builder.WriteString(fmt.Sprintf("   Resources with Drift: %s\n", crg.colorize("0", ColorGreen)))
+		builder.WriteString(fmt.Sprintf("   %s\n", crg.colorize("✅ No drift detected!", ColorGreen+ColorBold)))
+		return builder.String()
+	}
+
 	var builder strings.Builder
 
 	totalResources := len(results)
@@ -422,57 +430,6 @@ func (crg *ConsoleReportGenerator) generateResultsBySeverity(results map[string]
 				builder.WriteString(fmt.Sprintf("     • %s (%d differences)\n", result.ResourceID, len(result.Differences)))
 			}
 		}
-	}
-
-	return builder.String()
-}
-
-// generateColoredRecommendations creates colored recommendations
-func (crg *ConsoleReportGenerator) generateColoredRecommendations(results map[string]*drift.DriftResult) string {
-	var builder strings.Builder
-
-	// Check if there are any resources with drift
-	hasRecommendations := false
-	for _, result := range results {
-		if result.HasDrift {
-			hasRecommendations = true
-			break
-		}
-	}
-
-	if !hasRecommendations {
-		return crg.colorize("\n🎉 No recommendations needed - all resources are in sync!\n", ColorGreen+ColorBold)
-	}
-
-	builder.WriteString(crg.colorize("\n💡 RECOMMENDATIONS:\n", ColorBold+ColorWhite))
-
-	priority := 1
-	for _, result := range results {
-		if !result.HasDrift {
-			continue
-		}
-
-		var actionText string
-		var actionColor string
-
-		switch result.OverallSeverity {
-		case drift.SeverityCritical:
-			actionText = "🚨 IMMEDIATE ACTION REQUIRED"
-			actionColor = ColorRed + ColorBold
-		case drift.SeverityHigh:
-			actionText = "⚠️  HIGH PRIORITY"
-			actionColor = ColorRed
-		case drift.SeverityMedium:
-			actionText = "📋 REVIEW REQUIRED"
-			actionColor = ColorYellow
-		case drift.SeverityLow:
-			actionText = "📝 CONSIDER UPDATING"
-			actionColor = ColorBlue
-		}
-
-		builder.WriteString(fmt.Sprintf("   %d. %s: %s\n", priority, crg.colorize(actionText, actionColor), result.ResourceID))
-		builder.WriteString(fmt.Sprintf("      %s\n", crg.colorize("terraform plan && terraform apply", ColorCyan)))
-		priority++
 	}
 
 	return builder.String()

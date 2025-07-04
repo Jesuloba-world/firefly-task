@@ -22,8 +22,7 @@ const (
 	ErrorTypeTemplateError
 	// ErrorTypeFilterError indicates an error in result filtering
 	ErrorTypeFilterError
-	// ErrorTypeRecommendationError indicates an error generating recommendations
-	ErrorTypeRecommendationError
+
 	// ErrorTypeUnsupportedFormat indicates an unsupported format was requested
 	ErrorTypeUnsupportedFormat
 	// ErrorTypeFileOperation indicates a file operation error
@@ -55,8 +54,7 @@ func (et ErrorType) String() string {
 		return "template_error"
 	case ErrorTypeFilterError:
 		return "filter_error"
-	case ErrorTypeRecommendationError:
-		return "recommendation_error"
+
 	case ErrorTypeUnsupportedFormat:
 		return "unsupported_format"
 	case ErrorTypeFileOperation:

@@ -9,45 +9,7 @@ import (
 	"firefly-task/drift"
 )
 
-// Test data setup
-func createTestDriftResults() map[string]*drift.DriftResult {
-	results := make(map[string]*drift.DriftResult)
 
-	// Create a result with drift
-	result1 := drift.NewDriftResult("aws_instance.web-server-1", "i-1234567890abcdef0")
-	result1.AddDifference(drift.AttributeDifference{
-		AttributeName: "instance_type",
-		ExpectedValue: "t3.micro",
-		ActualValue:   "t3.small",
-		Severity:      drift.SeverityMedium,
-		Description:   "Instance type mismatch",
-	})
-	result1.AddDifference(drift.AttributeDifference{
-		AttributeName: "security_groups",
-		ExpectedValue: []string{"sg-12345"},
-		ActualValue:   []string{"sg-12345", "sg-67890"},
-		Severity:      drift.SeverityHigh,
-		Description:   "Additional security group attached",
-	})
-	results["aws_instance.web-server-1"] = result1
-
-	// Create a result without drift
-	result2 := drift.NewDriftResult("aws_instance.web-server-2", "i-0987654321fedcba0")
-	results["aws_instance.web-server-2"] = result2
-
-	// Create a result with critical drift
-	result3 := drift.NewDriftResult("aws_instance.database", "i-abcdef1234567890")
-	result3.AddDifference(drift.AttributeDifference{
-		AttributeName: "publicly_accessible",
-		ExpectedValue: false,
-		ActualValue:   true,
-		Severity:      drift.SeverityCritical,
-		Description:   "Database is publicly accessible",
-	})
-	results["aws_instance.database"] = result3
-
-	return results
-}
 
 func TestReportFormat_String(t *testing.T) {
 	tests := []struct {
@@ -77,7 +39,7 @@ func TestNewReportConfig(t *testing.T) {
 	assert.True(t, config.IncludeSummary)
 	assert.True(t, config.ColorOutput)
 	assert.Equal(t, drift.SeverityNone, config.FilterSeverity)
-	assert.True(t, config.IncludeRecommendations)
+
 	assert.False(t, config.ShowProgressIndicator)
 }
 
@@ -128,7 +90,7 @@ func TestReportSummary_Creation(t *testing.T) {
 
 	summary := &ReportSummary{
 		TotalResources:     len(results),
-		ResourcesWithDrift: 2,
+		ResourcesWithDrift: 3,
 		TotalDifferences:   3,
 		SeverityCounts: map[string]int{
 			"critical": 1,
@@ -139,8 +101,8 @@ func TestReportSummary_Creation(t *testing.T) {
 		OverallStatus:  "drift_detected",
 	}
 
-	assert.Equal(t, 3, summary.TotalResources)
-	assert.Equal(t, 2, summary.ResourcesWithDrift)
+	assert.Equal(t, 4, summary.TotalResources)
+	assert.Equal(t, 3, summary.ResourcesWithDrift)
 	assert.Equal(t, 3, summary.TotalDifferences)
 	assert.Equal(t, "drift_detected", summary.OverallStatus)
 	assert.Equal(t, 1, summary.SeverityCounts["critical"])
@@ -148,22 +110,7 @@ func TestReportSummary_Creation(t *testing.T) {
 	assert.Equal(t, 1, summary.SeverityCounts["medium"])
 }
 
-func TestRecommendation_Creation(t *testing.T) {
-	rec := &Recommendation{
-		ResourceID:  "aws_instance.web-server-1",
-		Severity:    drift.SeverityHigh,
-		Title:       "Fix instance type drift",
-		Description: "Update instance type to match configuration",
-		Action:      "terraform apply",
-		Priority:    1,
-	}
 
-	assert.Equal(t, "aws_instance.web-server-1", rec.ResourceID)
-	assert.Equal(t, "Fix instance type drift", rec.Title)
-	assert.Equal(t, drift.SeverityHigh, rec.Severity)
-	assert.Equal(t, "terraform apply", rec.Action)
-	assert.Equal(t, 1, rec.Priority)
-}
 
 func TestReportData_Creation(t *testing.T) {
 	results := createTestDriftResults()
@@ -178,13 +125,11 @@ func TestReportData_Creation(t *testing.T) {
 			GenerationTime:     time.Now().Format(time.RFC3339),
 			OverallStatus:      "drift_detected",
 		},
-		Recommendations: []Recommendation{},
 		Metadata:        map[string]interface{}{"version": "1.0"},
 	}
 
 	assert.NotNil(t, reportData.Results)
 	assert.NotNil(t, reportData.Summary)
-	assert.NotNil(t, reportData.Recommendations)
 	assert.NotNil(t, reportData.Metadata)
 }
 

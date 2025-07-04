@@ -86,8 +86,8 @@ func TestNewReportGenerator(t *testing.T) {
 
 				// Check error type
 				reportErr, ok := err.(*ReportError)
-				assert.True(t, ok)
-				assert.Equal(t, ErrorTypeUnsupportedFormat, reportErr.Type)
+				require.True(t, ok)
+				assert.Equal(t, ErrorTypeInvalidGenerator, reportErr.Type)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, generator)
@@ -374,8 +374,8 @@ func TestFactoryErrorHandling(t *testing.T) {
 	// Check error details
 	reportErr, ok := err.(*ReportError)
 	require.True(t, ok)
-	assert.Equal(t, ErrorTypeUnsupportedFormat, reportErr.Type)
-	assert.Contains(t, reportErr.Message, "unsupported generator type")
+	assert.Equal(t, ErrorTypeInvalidGenerator, reportErr.Type)
+	assert.Contains(t, reportErr.Message, "unsupported report generator type")
 
 	// Test with config
 	generator2, err2 := NewReportGeneratorWithConfig(invalidType, NewReportConfig())

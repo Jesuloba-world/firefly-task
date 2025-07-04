@@ -3,7 +3,6 @@ package report
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ func TestStandardReportGenerator_GenerateJSON(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, resultsData, "aws_instance.web-server-1")
 	assert.Contains(t, resultsData, "aws_instance.web-server-2")
-	assert.Contains(t, resultsData, "aws_instance.database")
+	assert.Contains(t, resultsData, "aws_db_instance.database")
 
 	// Check summary structure
 	summaryData, ok := reportData["summary"].(map[string]interface{})
@@ -91,7 +90,7 @@ func TestStandardReportGenerator_GenerateTable(t *testing.T) {
 	// Check resource entries
 	assert.Contains(t, tableString, "aws_instance.web-server-1")
 	assert.Contains(t, tableString, "aws_instance.web-server-2")
-	assert.Contains(t, tableString, "aws_instance.database")
+	assert.Contains(t, tableString, "aws_db_instance.database")
 
 	// Check drift indicators
 	assert.Contains(t, tableString, "DRIFT")
@@ -174,10 +173,10 @@ func TestStandardReportGenerator_FilterBySeverity(t *testing.T) {
 	resultsData, ok := reportData["results"].(map[string]interface{})
 	require.True(t, ok)
 
-	// Should include database (critical) and web-server-1 (has high severity difference)
-	// Should exclude web-server-2 (no drift)
-	assert.Contains(t, resultsData, "aws_instance.database")
-	assert.Contains(t, resultsData, "aws_instance.web-server-1")
+	// Should include web-server-2 (critical) and exclude others
+	assert.Contains(t, resultsData, "aws_instance.web-server-2")
+	assert.NotContains(t, resultsData, "aws_instance.web-server-1")
+	assert.NotContains(t, resultsData, "aws_db_instance.database")
 }
 
 func TestStandardReportGenerator_GenerateSummary(t *testing.T) {
@@ -186,35 +185,15 @@ func TestStandardReportGenerator_GenerateSummary(t *testing.T) {
 
 	summary := generator.generateSummary(results)
 
-	assert.Equal(t, 3, summary.TotalResources)
-	assert.Equal(t, 2, summary.ResourcesWithDrift)
+	assert.Equal(t, 4, summary.TotalResources)
+	assert.Equal(t, 3, summary.ResourcesWithDrift)
 	assert.Equal(t, 3, summary.TotalDifferences)
 	assert.NotEmpty(t, summary.SeverityCounts)
 	assert.NotEmpty(t, summary.OverallStatus)
 	assert.NotEmpty(t, summary.GenerationTime)
 }
 
-func TestStandardReportGenerator_GenerateRecommendations(t *testing.T) {
-	generator := NewStandardReportGenerator()
-	results := createTestDriftResults()
 
-	recommendations := generator.generateRecommendations(results)
-
-	// Should generate recommendations for resources with drift
-	assert.NotEmpty(t, recommendations)
-
-	// Check that recommendations contain expected elements
-	found := false
-	for _, rec := range recommendations {
-		if strings.Contains(rec.Title, "instance_type") ||
-			strings.Contains(rec.Title, "security_groups") ||
-			strings.Contains(rec.Title, "publicly_accessible") {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Should generate recommendations for detected drift")
-}
 
 // Test with empty results
 func TestStandardReportGenerator_EmptyResults(t *testing.T) {

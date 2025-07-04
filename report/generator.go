@@ -54,8 +54,7 @@ type ReportConfig struct {
 	ColorOutput bool
 	// FilterSeverity filters results by minimum severity level
 	FilterSeverity drift.DriftSeverity
-	// IncludeRecommendations includes actionable recommendations
-	IncludeRecommendations bool
+
 	// ShowProgressIndicator shows progress for long operations
 	ShowProgressIndicator bool
 }
@@ -99,21 +98,7 @@ type ReportSummary struct {
 	HighestSeverity string `json:"highest_severity"`
 }
 
-// Recommendation represents an actionable recommendation
-type Recommendation struct {
-	// ResourceID identifies the resource this recommendation applies to
-	ResourceID string `json:"resource_id"`
-	// Severity indicates the importance of this recommendation
-	Severity drift.DriftSeverity `json:"severity"`
-	// Title is a short description of the recommendation
-	Title string `json:"title"`
-	// Description provides detailed information about the recommendation
-	Description string `json:"description"`
-	// Action suggests what action should be taken
-	Action string `json:"action"`
-	// Priority indicates the order in which recommendations should be addressed
-	Priority int `json:"priority"`
-}
+
 
 // ReportData represents the complete report data structure
 type ReportData struct {
@@ -121,8 +106,7 @@ type ReportData struct {
 	Summary ReportSummary `json:"summary"`
 	// Results contains the detailed drift results
 	Results map[string]*drift.DriftResult `json:"results"`
-	// Recommendations contains actionable recommendations
-	Recommendations []Recommendation `json:"recommendations,omitempty"`
+
 	// Metadata contains additional report metadata
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	// Timestamp indicates when the report was generated
@@ -137,7 +121,7 @@ func NewReportConfig() *ReportConfig {
 		IncludeSummary:         true,
 		ColorOutput:            true,
 		FilterSeverity:         drift.SeverityNone,
-		IncludeRecommendations: true,
+
 		ShowProgressIndicator:  false,
 	}
 }

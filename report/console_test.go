@@ -29,16 +29,22 @@ func TestConsoleReportGenerator_GenerateConsole(t *testing.T) {
 	assert.Contains(t, consoleOutput, "SUMMARY")
 	assert.Contains(t, consoleOutput, "Total Resources:")
 	assert.Contains(t, consoleOutput, "Resources with Drift:")
-	assert.Contains(t, consoleOutput, "Highest Severity:")
+	assert.Contains(t, consoleOutput, "Total Differences:")
+
+	// Check severity breakdown
+	assert.Contains(t, consoleOutput, "SEVERITY BREAKDOWN")
+	assert.Contains(t, consoleOutput, "Critical:")
+	assert.Contains(t, consoleOutput, "Medium:")
+	assert.Contains(t, consoleOutput, "Low:")
 
 	// Check detailed results section
 	assert.Contains(t, consoleOutput, "DETAILED RESULTS")
 	assert.Contains(t, consoleOutput, "aws_instance.web-server-1")
-	assert.Contains(t, consoleOutput, "aws_instance.database")
+	assert.Contains(t, consoleOutput, "aws_db_instance.database")
 
 	// Check drift indicators
-	assert.Contains(t, consoleOutput, "[DRIFT]")
-	assert.Contains(t, consoleOutput, "[NO DRIFT]")
+	assert.Contains(t, consoleOutput, "Drift Detected")
+	assert.Contains(t, consoleOutput, "No Drift")
 }
 
 func TestConsoleReportGenerator_GenerateConsoleWithColor(t *testing.T) {
@@ -232,49 +238,30 @@ func TestConsoleReportGenerator_GenerateProgressIndicator(t *testing.T) {
 }
 */
 
-/*
-func TestConsoleReportGenerator_GenerateRecommendationsSection(t *testing.T) {
-	generator := NewConsoleReportGenerator()
-	recommendations := []Recommendation{
-		{
-			ID:          "rec-001",
-			Title:       "Fix instance type drift",
-			Description: "Update instance type configuration",
-			Priority:    "high",
-			Actions:     []string{"terraform plan", "terraform apply"},
-		},
-		{
-			ID:          "rec-002",
-			Title:       "Review security groups",
-			Description: "Check security group configuration",
-			Priority:    "medium",
-			Actions:     []string{"Review configuration"},
-		},
-	}
 
-	section := generator.generateRecommendationsSection(recommendations, false)
-
-	assert.Contains(t, section, "RECOMMENDATIONS")
-	assert.Contains(t, section, "Fix instance type drift")
-	assert.Contains(t, section, "Review security groups")
-	assert.Contains(t, section, "terraform plan")
-	assert.Contains(t, section, "Priority: high")
-	assert.Contains(t, section, "Priority: medium")
-}
-*/
 
 // Test edge cases
 func TestConsoleReportGenerator_EmptyResults(t *testing.T) {
 	generator := NewConsoleReportGenerator()
-	emptyResults := make(map[string]*drift.DriftResult)
-	config := NewReportConfig().WithFormat(FormatConsole)
+	results := make(map[string]*drift.DriftResult)
+	config := NewReportConfig().WithFormat(FormatConsole).WithColor(false)
 
-	data, err := generator.GenerateReport(emptyResults, *config)
+	data, err := generator.GenerateReport(results, *config)
 	require.NoError(t, err)
+	require.NotEmpty(t, data)
 
 	consoleOutput := string(data)
-	assert.Contains(t, consoleOutput, "Total Resources: 0")
-	assert.Contains(t, consoleOutput, "No drift detected")
+
+	assert.Contains(t, consoleOutput, "No drift detected!")
+	assert.Regexp(t, `Total Resources: .*0`, consoleOutput)
+
+	// Test with color enabled
+	config.WithColor(true)
+	data, err = generator.GenerateReport(results, *config)
+	require.NoError(t, err)
+	consoleOutput = string(data)
+	assert.Contains(t, consoleOutput, "No drift detected!")
+	assert.Regexp(t, `Total Resources: .*0`, consoleOutput)
 }
 
 func TestConsoleReportGenerator_NilResults(t *testing.T) {

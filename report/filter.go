@@ -126,17 +126,23 @@ func (fc *FilterCriteria) WithMinSeverity(severity drift.DriftSeverity) *FilterC
 
 // WithResourcePattern sets the resource pattern
 func (fc *FilterCriteria) WithResourcePattern(pattern string) *FilterCriteria {
-	if compiled, err := regexp.Compile(pattern); err == nil {
-		fc.ResourcePattern = compiled
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		// A regex that will never match
+		compiled = regexp.MustCompile(`\b\B`)
 	}
+	fc.ResourcePattern = compiled
 	return fc
 }
 
 // WithAttributePattern sets the attribute pattern
 func (fc *FilterCriteria) WithAttributePattern(pattern string) *FilterCriteria {
-	if compiled, err := regexp.Compile(pattern); err == nil {
-		fc.AttributePattern = compiled
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		// A regex that will never match
+		compiled = regexp.MustCompile(`\b\B`)
 	}
+	fc.AttributePattern = compiled
 	return fc
 }
 
@@ -237,9 +243,12 @@ func (rf *ResultFilter) WithResourceTypes(resourceTypes ...string) *ResultFilter
 
 // WithResourcePattern filters by resource ID pattern
 func (rf *ResultFilter) WithResourcePattern(pattern string) *ResultFilter {
-	if compiled, err := regexp.Compile(pattern); err == nil {
-		rf.criteria.ResourcePattern = compiled
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		// A regex that will never match
+		compiled = regexp.MustCompile(`\b\B`)
 	}
+	rf.criteria.ResourcePattern = compiled
 	return rf
 }
 
@@ -251,9 +260,12 @@ func (rf *ResultFilter) WithAttributeNames(attributeNames ...string) *ResultFilt
 
 // WithAttributePattern filters by attribute name pattern
 func (rf *ResultFilter) WithAttributePattern(pattern string) *ResultFilter {
-	if compiled, err := regexp.Compile(pattern); err == nil {
-		rf.criteria.AttributePattern = compiled
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		// A regex that will never match
+		compiled = regexp.MustCompile(`\b\B`)
 	}
+	rf.criteria.AttributePattern = compiled
 	return rf
 }
 
@@ -299,7 +311,7 @@ func (rf *ResultFilter) WithSort(sortBy FilterSortBy, order FilterSortOrder) *Re
 }
 
 // Apply applies the filter to drift results
-func (rf *ResultFilter) Apply(results map[string]*drift.DriftResult) map[string]*drift.DriftResult {
+func (rf *ResultFilter) Apply(results map[string]*drift.DriftResult) []*drift.DriftResult {
 	if results == nil {
 		return nil
 	}
@@ -323,13 +335,7 @@ func (rf *ResultFilter) Apply(results map[string]*drift.DriftResult) map[string]
 		resultList = rf.paginateResults(resultList)
 	}
 
-	// Convert back to map
-	filteredResults := make(map[string]*drift.DriftResult)
-	for _, result := range resultList {
-		filteredResults[result.ResourceID] = result
-	}
-
-	return filteredResults
+	return resultList
 }
 
 // matchesResourceCriteria checks if a result matches resource-level criteria
