@@ -1,0 +1,104 @@
+{
+  "Instances": [
+    {
+      "AmiLaunchIndex": 0,
+      "ImageId": "ami-0c55b159cbfafe1f0",
+      "InstanceId": "i-0123456789abcdef0",
+      "InstanceType": "t2.micro",
+      "KeyName": "my-key-pair",
+      "LaunchTime": "2023-04-01T12:00:00Z",
+      "Monitoring": {
+        "State": "disabled"
+      },
+      "Placeholders": {},
+      "PrivateDnsName": "ip-172-31-28-69.ec2.internal",
+      "PrivateIpAddress": "172.31.28.69",
+      "ProductCodes": [],
+      "PublicDnsName": "ec2-34-207-195-254.compute-1.amazonaws.com",
+      "PublicIpAddress": "34.207.195.254",
+      "State": {
+        "Code": 16,
+        "Name": "running"
+      },
+      "StateTransitionReason": "",
+      "SubnetId": "subnet-04a12345",
+      "VpcId": "vpc-0f987654",
+      "Architecture": "x86_64",
+      "BlockDeviceMappings": [
+        {
+          "DeviceName": "/dev/sda1",
+          "Ebs": {
+            "AttachTime": "2023-04-01T12:00:00Z",
+            "DeleteOnTermination": true,
+            "Status": "attached",
+            "VolumeId": "vol-0abc123def456"
+          }
+        }
+      ],
+      "ClientToken": "",
+      "EbsOptimized": false,
+      "EnaSupport": true,
+      "Hypervisor": "xen",
+      "NetworkInterfaces": [
+        {
+          "Association": {
+            "IpOwnerId": "amazon",
+            "PublicDnsName": "ec2-34-207-195-254.compute-1.amazonaws.com",
+            "PublicIp": "34.207.195.254"
+          },
+          "Attachment": {
+            "AttachTime": "2023-04-01T12:00:00Z",
+            "AttachmentId": "eni-attach-01234567",
+            "DeleteOnTermination": true,
+            "DeviceIndex": 0,
+            "Status": "attached"
+          },
+          "Description": "",
+          "Groups": [
+            {
+              "GroupName": "launch-wizard-1",
+              "GroupId": "sg-0123456789abcdef0"
+            }
+          ],
+          "Ipv6Addresses": [],
+          "MacAddress": "0A:1B:2C:3D:4E:5F",
+          "NetworkInterfaceId": "eni-0fedcba987654321",
+          "OwnerId": "123456789012",
+          "PrivateIpAddress": "172.31.28.69",
+          "PrivateIpAddresses": [
+            {
+              "Association": {
+                "IpOwnerId": "amazon",
+                "PublicDnsName": "ec2-34-207-195-254.compute-1.amazonaws.com",
+                "PublicIp": "34.207.195.254"
+              },
+              "Primary": true,
+              "PrivateIpAddress": "172.31.28.69"
+            }
+          ],
+          "SourceDestCheck": true,
+          "Status": "in-use",
+          "SubnetId": "subnet-04a12345",
+          "VpcId": "vpc-0f987654"
+        }
+      ],
+      "RootDeviceName": "/dev/sda1",
+      "RootDeviceType": "ebs",
+      "SecurityGroups": [
+        {
+          "GroupName": "launch-wizard-1",
+          "GroupId": "sg-0123456789abcdef0"
+        }
+      ],
+      "SourceDestCheck": true,
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "HelloWorld"
+        }
+      ],
+      "VirtualizationType": "hvm"
+    }
+  ],
+  "ReservationId": "r-0123456789abcdef0"
+}
