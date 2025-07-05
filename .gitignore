@@ -77,5 +77,6 @@ secrets.json
 
 # Ignore json files, which are typically generated reports or responses
 *.json
+!ec2_response.json
 
 !cmd/
