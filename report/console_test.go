@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 func TestConsoleReportGenerator_GenerateConsole(t *testing.T) {
@@ -243,7 +243,7 @@ func TestConsoleReportGenerator_GenerateProgressIndicator(t *testing.T) {
 // Test edge cases
 func TestConsoleReportGenerator_EmptyResults(t *testing.T) {
 	generator := NewConsoleReportGenerator()
-	results := make(map[string]*drift.DriftResult)
+	results := make(map[string]*interfaces.DriftResult)
 	config := NewReportConfig().WithFormat(FormatConsole).WithColor(false)
 
 	data, err := generator.GenerateReport(results, *config)

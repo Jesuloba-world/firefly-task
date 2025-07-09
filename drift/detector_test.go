@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"firefly-task/aws"
+	"firefly-task/pkg/interfaces"
 	"firefly-task/terraform"
 )
 
@@ -132,19 +133,19 @@ func TestDetectDrift_IdenticalResources(t *testing.T) {
 		t.Fatalf("DetectDrift() error = %v", err)
 	}
 
-	if result.HasDrift {
+	if result.IsDrifted {
 		t.Error("Expected no drift for identical resources")
-		for _, diff := range result.Differences {
-			t.Logf("Difference: %s - AWS: %v, Terraform: %v", diff.AttributeName, diff.ActualValue, diff.ExpectedValue)
+		for _, diff := range result.DriftDetails {
+			t.Logf("Difference: %s - AWS: %v, Terraform: %v", diff.Attribute, diff.ActualValue, diff.ExpectedValue)
 		}
 	}
 
-	if result.OverallSeverity != SeverityNone {
-		t.Errorf("Expected SeverityNone, got %v", result.OverallSeverity)
+	if result.Severity != interfaces.SeverityNone {
+		t.Errorf("Expected SeverityNone, got %v", result.Severity)
 	}
 
-	if len(result.Differences) != 0 {
-		t.Errorf("Expected 0 differences, got %d", len(result.Differences))
+	if len(result.DriftDetails) != 0 {
+		t.Errorf("Expected 0 differences, got %d", len(result.DriftDetails))
 	}
 }
 
@@ -195,15 +196,15 @@ func TestDetectDrift_WithDifferences(t *testing.T) {
 		t.Fatalf("DetectDrift() error = %v", err)
 	}
 
-	if !result.HasDrift {
+	if !result.IsDrifted {
 		t.Error("Expected drift to be detected")
 	}
 
-	if result.OverallSeverity == SeverityNone {
-		t.Error("Expected non-zero severity")
+	if result.Severity == interfaces.SeverityNone {
+		t.Errorf("Expected non-zero severity, got %v. Drift details: %d", result.Severity, len(result.DriftDetails))
 	}
 
-	if len(result.Differences) == 0 {
+	if len(result.DriftDetails) == 0 {
 		t.Error("Expected differences to be found")
 	}
 
@@ -213,26 +214,26 @@ func TestDetectDrift_WithDifferences(t *testing.T) {
 	foundTags := false
 	foundMonitoring := false
 
-	for _, diff := range result.Differences {
-		switch diff.AttributeName {
+	for _, diff := range result.DriftDetails {
+		switch diff.Attribute {
 		case "instance_type":
 			foundInstanceType = true
-			if diff.Severity != SeverityCritical {
+			if diff.Severity != interfaces.SeverityCritical {
 				t.Errorf("Expected instance_type to have critical severity, got %v", diff.Severity)
 			}
 		case "security_groups":
 			foundSecurityGroups = true
-			if diff.Severity != SeverityCritical {
+			if diff.Severity != interfaces.SeverityCritical {
 				t.Errorf("Expected security_groups to have critical severity, got %v", diff.Severity)
 			}
 		case "tags":
 			foundTags = true
-			if diff.Severity != SeverityMedium {
+			if diff.Severity != interfaces.SeverityMedium {
 				t.Errorf("Expected tags to have medium severity, got %v", diff.Severity)
 			}
 		case "monitoring":
 			foundMonitoring = true
-			if diff.Severity != SeverityHigh {
+			if diff.Severity != interfaces.SeverityHigh {
 				t.Errorf("Expected monitoring to have high severity, got %v", diff.Severity)
 			}
 		}
@@ -279,13 +280,13 @@ func TestDetectDrift_IgnoredAttributes(t *testing.T) {
 	}
 
 	// Should not detect drift because instance_type is ignored
-	if result.HasDrift {
+	if result.IsDrifted {
 		t.Error("Expected no drift when instance_type is ignored")
 	}
 
 	// Verify instance_type difference is not in results
-	for _, diff := range result.Differences {
-		if diff.AttributeName == "instance_type" {
+	for _, diff := range result.DriftDetails {
+		if diff.Attribute == "instance_type" {
 			t.Error("instance_type should be ignored but was found in differences")
 		}
 	}
@@ -340,12 +341,12 @@ func TestDetectDriftBatch(t *testing.T) {
 	}
 
 	// First resource should have no drift
-	if results[0].HasDrift {
+	if results[0].IsDrifted {
 		t.Error("First resource should have no drift")
 	}
 
 	// Second resource should have drift
-	if !results[1].HasDrift {
+	if !results[1].IsDrifted {
 		t.Error("Second resource should have drift")
 	}
 }

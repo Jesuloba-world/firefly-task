@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 // CICDPlatform represents different CI/CD platforms
@@ -113,7 +113,7 @@ func (crg *CIReportGenerator) WithConfig(config *ReportConfig) ReportGenerator {
 }
 
 // GenerateReport generates a CI-friendly report
-func (crg *CIReportGenerator) GenerateReport(results map[string]*drift.DriftResult, config ReportConfig) ([]byte, error) {
+func (crg *CIReportGenerator) GenerateReport(results map[string]*interfaces.DriftResult, config ReportConfig) ([]byte, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -122,7 +122,11 @@ func (crg *CIReportGenerator) GenerateReport(results map[string]*drift.DriftResu
 	case FormatJSON:
 		return crg.GenerateJSONReport(results)
 	case FormatCI:
-		return crg.generateJUnitXMLReport(results)
+		interfaceResults := make(map[string]interfaces.DriftResult)
+		for k, v := range results {
+			interfaceResults[k] = *v
+		}
+		return crg.generateJUnitXMLReport(interfaceResults)
 	default:
 		// Default to JSON for CI
 		return crg.GenerateJSONReport(results)
@@ -130,7 +134,7 @@ func (crg *CIReportGenerator) GenerateReport(results map[string]*drift.DriftResu
 }
 
 // GenerateJSONReport generates a JSON report optimized for CI/CD
-func (crg *CIReportGenerator) GenerateJSONReport(results map[string]*drift.DriftResult) ([]byte, error) {
+func (crg *CIReportGenerator) GenerateJSONReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -147,14 +151,12 @@ func (crg *CIReportGenerator) GenerateJSONReport(results map[string]*drift.Drift
 }
 
 // GenerateYAMLReport generates YAML (delegates to standard implementation)
-func (crg *CIReportGenerator) GenerateYAMLReport(results map[string]*drift.DriftResult) ([]byte, error) {
-	// Use standard generator for YAML
-	standardGen := NewStandardReportGenerator()
-	return standardGen.GenerateYAMLReport(results)
+func (crg *CIReportGenerator) GenerateYAMLReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
+	return nil, fmt.Errorf("YAML report generation is not supported in CICD mode with the new interface types")
 }
 
 // GenerateTableReport generates a simple table for CI logs
-func (crg *CIReportGenerator) GenerateTableReport(results map[string]*drift.DriftResult) (string, error) {
+func (crg *CIReportGenerator) generateSummary(results map[string]interfaces.DriftResult) (string, error) {
 	if results == nil {
 		return "", NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -170,11 +172,11 @@ func (crg *CIReportGenerator) GenerateTableReport(results map[string]*drift.Drif
 	totalDifferences := 0
 
 	for _, result := range results {
-		if result.HasDrift {
-			resourcesWithDrift++
-			totalDifferences += len(result.Differences)
+		if result.IsDrifted {
+				resourcesWithDrift++
+				totalDifferences += len(result.DriftDetails)
+			}
 		}
-	}
 
 	builder.WriteString(fmt.Sprintf("Total Resources: %d\n", totalResources))
 	builder.WriteString(fmt.Sprintf("Resources with Drift: %d\n", resourcesWithDrift))
@@ -183,9 +185,9 @@ func (crg *CIReportGenerator) GenerateTableReport(results map[string]*drift.Drif
 	if resourcesWithDrift > 0 {
 		builder.WriteString("\nRESOURCES WITH DRIFT:\n")
 		for resourceID, result := range results {
-			if result.HasDrift {
+			if result.IsDrifted {
 				builder.WriteString(fmt.Sprintf("- %s (%d differences, severity: %s)\n",
-					resourceID, len(result.Differences), result.OverallSeverity.String()))
+					resourceID, len(result.DriftDetails), string(result.Severity)))
 			}
 		}
 	} else {
@@ -196,7 +198,7 @@ func (crg *CIReportGenerator) GenerateTableReport(results map[string]*drift.Drif
 }
 
 // generateJUnitXMLReport generates JUnit XML format for CI systems
-func (crg *CIReportGenerator) generateJUnitXMLReport(results map[string]*drift.DriftResult) ([]byte, error) {
+func (crg *CIReportGenerator) generateJUnitXMLReport(results map[string]interfaces.DriftResult) ([]byte, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -211,12 +213,12 @@ func (crg *CIReportGenerator) generateJUnitXMLReport(results map[string]*drift.D
 			Time:      0.001,
 		}
 
-		if result.HasDrift {
+		if result.IsDrifted {
 			failures++
 			testCase.Failure = &JUnitFailure{
 				Message: fmt.Sprintf("Drift detected in %s", resourceID),
 				Type:    "DriftDetected",
-				Content: fmt.Sprintf("Resource %s has %d differences with %s severity", resourceID, len(result.Differences), result.OverallSeverity.String()),
+				Content: fmt.Sprintf("Resource %s has %d differences with %s severity", resourceID, len(result.DriftDetails), string(result.Severity)),
 			}
 		}
 
@@ -234,8 +236,16 @@ func (crg *CIReportGenerator) generateJUnitXMLReport(results map[string]*drift.D
 	return xml.MarshalIndent(testSuite, "", "  ")
 }
 
-// GenerateConsoleReport generates console output for CI
-func (crg *CIReportGenerator) GenerateConsoleReport(results map[string]*drift.DriftResult) (string, error) {
+
+func (crg *CIReportGenerator) GenerateTableReport(results map[string]*interfaces.DriftResult) (string, error) {
+	interfaceResults := make(map[string]interfaces.DriftResult)
+	for k, v := range results {
+		interfaceResults[k] = *v
+	}
+	return crg.generateSummary(interfaceResults)
+}
+
+func (crg *CIReportGenerator) GenerateConsoleReport(results map[string]*interfaces.DriftResult) (string, error) {
 	return crg.GenerateTableReport(results)
 }
 
@@ -245,12 +255,18 @@ func (crg *CIReportGenerator) WriteToFile(content []byte, filePath string) error
 }
 
 // GenerateCIReport generates a CI/CD-optimized report
-func (crg *CIReportGenerator) GenerateCIReport(results map[string]*drift.DriftResult) (*CIReport, error) {
+func (crg *CIReportGenerator) GenerateCIReport(results map[string]interfaces.DriftResult) (*CIReport, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
 
-	report := crg.buildCIReport(results)
+	interfaceResults := make(map[string]*interfaces.DriftResult)
+	for k, v := range results {
+		// Create a new variable to hold the value and get its address
+		vc := v
+		interfaceResults[k] = &vc
+	}
+	report := crg.buildCIReport(interfaceResults)
 
 	// Add metadata that was previously in this function
 	report.Metadata.Platform = string(crg.Platform)
@@ -268,15 +284,15 @@ func (crg *CIReportGenerator) GenerateCIReport(results map[string]*drift.DriftRe
 
 // CIReport represents a CI-optimized report structure
 type CIReport struct {
-	Version   string                        `json:"version"`
-	Type      string                        `json:"type"`
-	Timestamp string                        `json:"timestamp"`
-	Status    string                        `json:"status"`
-	ExitCode  int                           `json:"exit_code"`
-	Summary   CISummary                     `json:"summary"`
-	Results   map[string]*drift.DriftResult `json:"results"`
-	Actions   []CIAction                    `json:"actions"`
-	Metadata  CIMetadata                    `json:"metadata"`
+	Version   string                             `json:"version"`
+	Type      string                             `json:"type"`
+	Timestamp string                             `json:"timestamp"`
+	Status    string                             `json:"status"`
+	ExitCode  int                                `json:"exit_code"`
+	Summary   CISummary                          `json:"summary"`
+	Results   map[string]*interfaces.DriftResult `json:"results"`
+	Actions   []CIAction                         `json:"actions"`
+	Metadata  CIMetadata                         `json:"metadata"`
 }
 
 // CISummary contains CI-relevant summary information
@@ -344,7 +360,7 @@ type JUnitFailure struct {
 }
 
 // buildCIReport creates a CI-optimized report
-func (crg *CIReportGenerator) buildCIReport(results map[string]*drift.DriftResult) *CIReport {
+func (crg *CIReportGenerator) buildCIReport(results map[string]*interfaces.DriftResult) *CIReport {
 	summary := crg.buildCISummary(results)
 	actions := crg.generateCIActions(results)
 
@@ -382,29 +398,29 @@ func (crg *CIReportGenerator) buildCIReport(results map[string]*drift.DriftResul
 }
 
 // buildCISummary creates a CI-focused summary
-func (crg *CIReportGenerator) buildCISummary(results map[string]*drift.DriftResult) CISummary {
+func (crg *CIReportGenerator) buildCISummary(results map[string]*interfaces.DriftResult) CISummary {
 	totalResources := len(results)
 	resourcesWithDrift := 0
 	totalDifferences := 0
 	severityCounts := make(map[string]int)
-	highestSeverity := drift.SeverityNone
+	highestSeverity := interfaces.SeverityNone
 
 	for _, result := range results {
-		if result.HasDrift {
+		if result.IsDrifted {
 			resourcesWithDrift++
-			totalDifferences += len(result.Differences)
-			if result.OverallSeverity > highestSeverity {
-				highestSeverity = result.OverallSeverity
+			totalDifferences += len(result.DriftDetails)
+			if result.Severity > highestSeverity {
+				highestSeverity = result.Severity
 			}
 		}
-		severityCounts[strings.ToLower(result.OverallSeverity.String())]++
+		severityCounts[strings.ToLower(string(result.Severity))]++
 	}
 
 	cleanResources := totalResources - resourcesWithDrift
 
 	highestSeverityStr := "NONE"
-	if highestSeverity != drift.SeverityNone {
-		highestSeverityStr = strings.ToUpper(highestSeverity.String())
+	if highestSeverity != interfaces.SeverityNone {
+		highestSeverityStr = strings.ToUpper(string(highestSeverity))
 	}
 
 	return CISummary{
@@ -420,24 +436,24 @@ func (crg *CIReportGenerator) buildCISummary(results map[string]*drift.DriftResu
 }
 
 // generateCIActions creates actionable items from drift results
-func (crg *CIReportGenerator) generateCIActions(results map[string]*drift.DriftResult) []CIAction {
+func (crg *CIReportGenerator) generateCIActions(results map[string]*interfaces.DriftResult) []CIAction {
 	var actions []CIAction
 
 	for resourceID, result := range results {
-		if !result.HasDrift {
+		if !result.IsDrifted {
 			continue
 		}
 
-		for _, diff := range result.Differences {
+		for _, diff := range result.DriftDetails {
 			action := CIAction{
 				Type:        "drift-detected",
 				ResourceID:  resourceID,
-				Description: fmt.Sprintf("Drift detected in %s: %s", diff.AttributeName, diff.Description),
-				Priority:    strings.ToLower(diff.Severity.String()),
+				Description: fmt.Sprintf("Drift detected in %s: %s", diff.Attribute, diff.Description),
+				Priority:    strings.ToLower(string(diff.Severity)),
 			}
 
 			// Add command suggestions based on drift type
-			switch diff.DifferenceType {
+			switch diff.DriftType {
 			case "added":
 				action.Command = fmt.Sprintf("terraform import %s", resourceID)
 			case "removed":
@@ -462,11 +478,11 @@ func (crg *CIReportGenerator) generateCIActions(results map[string]*drift.DriftR
 }
 
 // WriteArtifacts writes CI/CD artifacts (reports, logs, etc.)
-func (ci *CIReportGenerator) WriteArtifacts(results map[string]*drift.DriftResult) ([]Artifact, error) {
+func (crg *CIReportGenerator) WriteArtifacts(results map[string]*interfaces.DriftResult) ([]Artifact, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
-	artifactDir := ci.OutputDir
+	artifactDir := crg.OutputDir
 	if err := os.MkdirAll(artifactDir, 0755); err != nil {
 		return nil, WrapReportError(ErrorTypeFileOperation, "failed to create artifact directory", err)
 	}
@@ -474,45 +490,56 @@ func (ci *CIReportGenerator) WriteArtifacts(results map[string]*drift.DriftResul
 	var artifacts []Artifact
 
 	// Write JSON artifact
-	jsonArtifact, err := ci.WriteJSONArtifact(results)
+	jsonArtifact, err := crg.WriteJSONArtifact(results)
 	if err != nil {
 		return nil, err
 	}
 	artifacts = append(artifacts, *jsonArtifact)
 
 	// Write JUnit XML artifact
-	junitArtifact, err := ci.WriteJUnitXMLArtifact(results)
+	junitArtifact, err := crg.WriteJUnitXMLArtifact(results)
 	if err != nil {
 		return nil, err
 	}
 	artifacts = append(artifacts, *junitArtifact)
 
 	// Write summary artifact
-	summaryArtifact, err := ci.WriteSummaryArtifact(results)
+	summaryArtifact, err := crg.WriteSummaryArtifact(results)
 	if err != nil {
 		return nil, err
 	}
 	artifacts = append(artifacts, *summaryArtifact)
 
 	// Write platform-specific artifacts
-	if err := ci.writePlatformSpecificArtifacts(results, artifactDir); err != nil {
+		interfaceResults := make(map[string]interfaces.DriftResult)
+	for k, v := range results {
+		interfaceResults[k] = *v
+	}
+	platformArtifacts, err := crg.writePlatformSpecificArtifacts(interfaceResults, artifactDir)
+	if err != nil {
 		return artifacts, err
 	}
+	artifacts = append(artifacts, platformArtifacts...)
 
 	return artifacts, nil
 }
 
 // WriteJSONArtifact writes a JSON artifact and returns artifact info
-func (ci *CIReportGenerator) WriteJSONArtifact(results map[string]*drift.DriftResult) (*Artifact, error) {
+func (crg *CIReportGenerator) WriteJSONArtifact(results map[string]*interfaces.DriftResult) (*Artifact, error) {
+	// Convert to interface results
+	interfaceResults := make(map[string]interfaces.DriftResult)
+	for k, v := range results {
+		interfaceResults[k] = *v
+	}
 	// Generate CI report
-	ciReport, err := ci.GenerateCIReport(results)
+	ciReport, err := crg.GenerateCIReport(interfaceResults)
 	if err != nil {
 		return nil, err
 	}
 
 	// Write CI report as JSON
-	filePath := filepath.Join(ci.OutputDir, "drift-report.ci.json")
-	if err = ci.writeJSONFile(ciReport, filePath); err != nil {
+	filePath := filepath.Join(crg.OutputDir, "drift-report.ci.json")
+	if err = crg.writeJSONFile(ciReport, filePath); err != nil {
 		return nil, err
 	}
 
@@ -530,9 +557,14 @@ func (ci *CIReportGenerator) WriteJSONArtifact(results map[string]*drift.DriftRe
 }
 
 // WriteJUnitXMLArtifact writes a JUnit XML artifact and returns artifact info
-func (ci *CIReportGenerator) WriteJUnitXMLArtifact(results map[string]*drift.DriftResult) (*Artifact, error) {
-	filePath := filepath.Join(ci.OutputDir, "drift-report.junit.xml")
-	if err := ci.writeJUnitXML(results, filePath); err != nil {
+func (crg *CIReportGenerator) WriteJUnitXMLArtifact(results map[string]*interfaces.DriftResult) (*Artifact, error) {
+	filePath := filepath.Join(crg.OutputDir, "drift-report.junit.xml")
+	// Convert to interface results
+	interfaceResults := make(map[string]interfaces.DriftResult)
+	for k, v := range results {
+		interfaceResults[k] = *v
+	}
+	if err := crg.writeJUnitXML(interfaceResults, filePath); err != nil {
 		return nil, err
 	}
 
@@ -550,9 +582,12 @@ func (ci *CIReportGenerator) WriteJUnitXMLArtifact(results map[string]*drift.Dri
 }
 
 // WriteSummaryArtifact writes a summary artifact and returns artifact info
-func (ci *CIReportGenerator) WriteSummaryArtifact(results map[string]*drift.DriftResult) (*Artifact, error) {
-	filePath := filepath.Join(ci.OutputDir, "drift-summary.md")
-	summary := ci.generateMarkdownSummary(results)
+func (crg *CIReportGenerator) WriteSummaryArtifact(results map[string]*interfaces.DriftResult) (*Artifact, error) {
+	filePath := filepath.Join(crg.OutputDir, "drift-summary.md")
+	summary, err := crg.generateMarkdownSummary(results)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.WriteFile(filePath, []byte(summary), 0644); err != nil {
 		return nil, WrapReportError(ErrorTypeFileOperation, "failed to write summary file", err)
 	}
@@ -571,7 +606,7 @@ func (ci *CIReportGenerator) WriteSummaryArtifact(results map[string]*drift.Drif
 }
 
 // SetExitCode sets appropriate exit code based on drift results
-func (ci *CIReportGenerator) SetExitCode(results map[string]*drift.DriftResult) int {
+func (crg *CIReportGenerator) SetExitCode(results map[string]*interfaces.DriftResult) int {
 	if results == nil {
 		return 1 // Error
 	}
@@ -581,12 +616,12 @@ func (ci *CIReportGenerator) SetExitCode(results map[string]*drift.DriftResult) 
 	hasDrift := false
 
 	for _, result := range results {
-		if result.HasDrift {
+		if result.IsDrifted {
 			hasDrift = true
-			switch result.OverallSeverity {
-			case drift.SeverityCritical:
+			switch result.Severity {
+			case interfaces.SeverityCritical:
 				hasCritical = true
-			case drift.SeverityHigh:
+			case interfaces.SeverityHigh:
 				hasHigh = true
 			}
 		}
@@ -605,8 +640,8 @@ func (ci *CIReportGenerator) SetExitCode(results map[string]*drift.DriftResult) 
 }
 
 // SetEnvironmentVariables sets CI/CD environment variables with results
-func (ci *CIReportGenerator) SetEnvironmentVariables(results map[string]*drift.DriftResult) error {
-	summary := ci.generateCISummary(results)
+func (crg *CIReportGenerator) SetEnvironmentVariables(results map[string]*interfaces.DriftResult) error {
+	summary := crg.buildCISummary(results)
 
 	// Determine max severity
 	maxSeverity := "low"
@@ -633,15 +668,15 @@ func (ci *CIReportGenerator) SetEnvironmentVariables(results map[string]*drift.D
 	}
 
 	// Set platform-specific environment variables
-	switch ci.Platform {
+	switch crg.Platform {
 	case PlatformGitHubActions:
-		return ci.setGitHubActionsEnv(envVars, results)
+		return crg.setGitHubActionsEnv(envVars, results)
 	case PlatformGitLab:
-		return ci.setGitLabEnv(envVars, results)
+		return crg.setGitLabEnv(envVars, results)
 	case PlatformJenkins:
-		return ci.setJenkinsEnv(envVars, results)
+		return crg.setJenkinsEnv(envVars, results)
 	default:
-		return ci.setGenericEnv(envVars)
+		return crg.setGenericEnv(envVars)
 	}
 }
 
@@ -653,8 +688,8 @@ type ArtifactInfo struct {
 }
 
 // GetArtifactInfo returns summary information about the generated artifacts
-func (ci *CIReportGenerator) GetArtifactInfo() (*ArtifactInfo, error) {
-	files, err := os.ReadDir(ci.OutputDir)
+func (crg *CIReportGenerator) GetArtifactInfo() (*ArtifactInfo, error) {
+	files, err := os.ReadDir(crg.OutputDir)
 	if err != nil {
 		return nil, WrapReportError(ErrorTypeFileOperation, "failed to read artifact directory", err)
 	}
@@ -681,8 +716,8 @@ func (ci *CIReportGenerator) GetArtifactInfo() (*ArtifactInfo, error) {
 
 // Helper methods for CI/CD metadata
 
-func (ci *CIReportGenerator) getJobID() string {
-	switch ci.Platform {
+func (crg *CIReportGenerator) getJobID() string {
+	switch crg.Platform {
 	case PlatformGitHubActions:
 		return os.Getenv("GITHUB_RUN_ID")
 	case PlatformGitLab:
@@ -698,8 +733,8 @@ func (ci *CIReportGenerator) getJobID() string {
 	}
 }
 
-func (ci *CIReportGenerator) getBuildNumber() string {
-	switch ci.Platform {
+func (crg *CIReportGenerator) getBuildNumber() string {
+	switch crg.Platform {
 	case PlatformGitHubActions:
 		return os.Getenv("GITHUB_RUN_NUMBER")
 	case PlatformGitLab:
@@ -715,8 +750,8 @@ func (ci *CIReportGenerator) getBuildNumber() string {
 	}
 }
 
-func (ci *CIReportGenerator) getBranch() string {
-	switch ci.Platform {
+func (crg *CIReportGenerator) getBranch() string {
+	switch crg.Platform {
 	case PlatformGitHubActions:
 		return strings.TrimPrefix(os.Getenv("GITHUB_REF"), "refs/heads/")
 	case PlatformGitLab:
@@ -732,8 +767,8 @@ func (ci *CIReportGenerator) getBranch() string {
 	}
 }
 
-func (ci *CIReportGenerator) getCommitSHA() string {
-	switch ci.Platform {
+func (crg *CIReportGenerator) getCommitSHA() string {
+	switch crg.Platform {
 	case PlatformGitHubActions:
 		return os.Getenv("GITHUB_SHA")
 	case PlatformGitLab:
@@ -750,11 +785,11 @@ func (ci *CIReportGenerator) getCommitSHA() string {
 }
 
 // SetPlatformSpecificVariables sets CI/CD environment variables with results
-func (ci *CIReportGenerator) SetPlatformSpecificVariables(results map[string]*drift.DriftResult) error {
+func (crg *CIReportGenerator) SetPlatformSpecificVariables(results map[string]*interfaces.DriftResult) error {
 	if results == nil {
 		return NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
-	summary := ci.generateCISummary(results)
+	summary := crg.buildCISummary(results)
 
 	// Set common environment variables
 	envVars := map[string]string{
@@ -770,21 +805,21 @@ func (ci *CIReportGenerator) SetPlatformSpecificVariables(results map[string]*dr
 	}
 
 	// Set platform-specific environment variables
-	switch ci.Platform {
+	switch crg.Platform {
 	case PlatformGitHubActions:
-		return ci.setGitHubActionsEnv(envVars, results)
+		return crg.setGitHubActionsEnv(envVars, results)
 	case PlatformGitLab:
-		return ci.setGitLabEnv(envVars, results)
+		return crg.setGitLabEnv(envVars, results)
 	case PlatformJenkins:
-		return ci.setJenkinsEnv(envVars, results)
+		return crg.setJenkinsEnv(envVars, results)
 	default:
-		return ci.setGenericEnv(envVars)
+		return crg.setGenericEnv(envVars)
 	}
 }
 
 // Platform-specific environment variable setters
 
-func (ci *CIReportGenerator) setGitHubActionsEnv(envVars map[string]string, results map[string]*drift.DriftResult) error {
+func (crg *CIReportGenerator) setGitHubActionsEnv(envVars map[string]string, results map[string]*interfaces.DriftResult) error {
 	// GitHub Actions uses GITHUB_ENV file
 	githubEnvFile := os.Getenv("GITHUB_ENV")
 	if githubEnvFile != "" {
@@ -830,16 +865,19 @@ func (ci *CIReportGenerator) setGitHubActionsEnv(envVars map[string]string, resu
 			return WrapReportError(ErrorTypeFileOperation, "failed to open GITHUB_STEP_SUMMARY file", err)
 		}
 		defer summaryFile.Close()
-		summary := ci.generateMarkdownSummary(results)
+		summary, err := crg.generateMarkdownSummary(results)
+		if err != nil {
+			return err
+		}
 		summaryFile.WriteString(summary)
 	}
 
 	return nil
 }
 
-func (ci *CIReportGenerator) setGitLabEnv(envVars map[string]string, results map[string]*drift.DriftResult) error {
+func (crg *CIReportGenerator) setGitLabEnv(envVars map[string]string, results map[string]*interfaces.DriftResult) error {
 	// GitLab CI uses dotenv artifacts
-	dotenvFile := filepath.Join(ci.workspace, "drift.env")
+	dotenvFile := filepath.Join(crg.workspace, "drift.env")
 	file, err := os.Create(dotenvFile)
 	if err != nil {
 		return WrapReportError(ErrorTypeFileOperation, "failed to create dotenv file", err)
@@ -855,9 +893,9 @@ func (ci *CIReportGenerator) setGitLabEnv(envVars map[string]string, results map
 	return nil
 }
 
-func (ci *CIReportGenerator) setJenkinsEnv(envVars map[string]string, results map[string]*drift.DriftResult) error {
+func (crg *CIReportGenerator) setJenkinsEnv(envVars map[string]string, results map[string]*interfaces.DriftResult) error {
 	// Jenkins can use properties file
-	propsFile := filepath.Join(ci.workspace, "drift.properties")
+	propsFile := filepath.Join(crg.workspace, "drift.properties")
 	file, err := os.Create(propsFile)
 	if err != nil {
 		return WrapReportError(ErrorTypeFileOperation, "failed to create properties file", err)
@@ -873,7 +911,7 @@ func (ci *CIReportGenerator) setJenkinsEnv(envVars map[string]string, results ma
 	return nil
 }
 
-func (ci *CIReportGenerator) setGenericEnv(envVars map[string]string) error {
+func (crg *CIReportGenerator) setGenericEnv(envVars map[string]string) error {
 	// For generic platforms, just set environment variables
 	for key, value := range envVars {
 		if err := os.Setenv(key, value); err != nil {
@@ -885,7 +923,7 @@ func (ci *CIReportGenerator) setGenericEnv(envVars map[string]string) error {
 
 // Helper methods for file writing
 
-func (ci *CIReportGenerator) writeJSONFile(data interface{}, filePath string) error {
+func (crg *CIReportGenerator) writeJSONFile(data interface{}, filePath string) error {
 	content, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return WrapReportError(ErrorTypeGenerationFailed, "failed to marshal JSON", err)
@@ -898,9 +936,9 @@ func (ci *CIReportGenerator) writeJSONFile(data interface{}, filePath string) er
 	return nil
 }
 
-func (ci *CIReportGenerator) writeJUnitXML(results map[string]*drift.DriftResult, filePath string) error {
+func (crg *CIReportGenerator) writeJUnitXML(results map[string]interfaces.DriftResult, filePath string) error {
 	// Generate JUnit XML content
-	xmlContent, err := ci.generateJUnitXMLReport(results)
+	xmlContent, err := crg.generateJUnitXMLReport(results)
 	if err != nil {
 		return err
 	}
@@ -912,8 +950,8 @@ func (ci *CIReportGenerator) writeJUnitXML(results map[string]*drift.DriftResult
 	return nil
 }
 
-func (ci *CIReportGenerator) writeSummaryFile(results map[string]*drift.DriftResult, filePath string) error {
-	summary := ci.generateCISummary(results)
+func (crg *CIReportGenerator) writeSummaryFile(results map[string]*interfaces.DriftResult, filePath string) error {
+	summary := crg.buildCISummary(results)
 	content := fmt.Sprintf(`Drift Detection Summary
 ======================
 
@@ -938,7 +976,7 @@ Platform: %s
 		summary.SeverityCounts["medium"],
 		summary.SeverityCounts["low"],
 		time.Now().Format(time.RFC3339),
-		ci.Platform,
+		crg.Platform,
 	)
 
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
@@ -948,59 +986,110 @@ Platform: %s
 	return nil
 }
 
-func (ci *CIReportGenerator) writePlatformSpecificArtifacts(results map[string]*drift.DriftResult, artifactDir string) error {
-	switch ci.Platform {
+func (crg *CIReportGenerator) writePlatformSpecificArtifacts(results map[string]interfaces.DriftResult, artifactDir string) ([]Artifact, error) {
+	switch crg.Platform {
 	case PlatformGitHubActions:
-		return ci.writeGitHubActionsArtifacts(results, artifactDir)
+		return crg.writeGitHubActionsArtifacts(results, artifactDir)
 	case PlatformGitLab:
-		return ci.writeGitLabArtifacts(results, artifactDir)
+		return crg.writeGitLabArtifacts(results, artifactDir)
 	case PlatformJenkins:
-		return ci.writeJenkinsArtifacts(results, artifactDir)
+		return crg.writeJenkinsArtifacts(results, artifactDir)
 	default:
-		return nil // No platform-specific artifacts
+		return nil, nil // No platform-specific artifacts
 	}
 }
 
-func (ci *CIReportGenerator) writeGitHubActionsArtifacts(results map[string]*drift.DriftResult, artifactDir string) error {
+func (crg *CIReportGenerator) writeGitHubActionsArtifacts(results map[string]interfaces.DriftResult, artifactDir string) ([]Artifact, error) {
 	// Write GitHub Actions job summary
 	summaryFile := filepath.Join(artifactDir, "github-summary.md")
-	summary := ci.generateMarkdownSummary(results)
-	return os.WriteFile(summaryFile, []byte(summary), 0644)
+	// Convert to pointer results
+	pointerResults := make(map[string]*interfaces.DriftResult)
+	for k, v := range results {
+		vc := v
+		pointerResults[k] = &vc
+	}
+	summary, err := crg.generateMarkdownSummary(pointerResults)
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(summaryFile, []byte(summary), 0644)
+	if err != nil {
+		return nil, WrapReportError(ErrorTypeFileOperation, "failed to write GitHub summary", err)
+	}
+	info, err := os.Stat(summaryFile)
+	if err != nil {
+		return nil, WrapReportError(ErrorTypeFileOperation, "failed to stat GitHub summary", err)
+	}
+	return []Artifact{{
+		Path: summaryFile,
+		Type: "github-summary-md",
+		Size: info.Size(),
+	}}, nil
 }
 
-func (ci *CIReportGenerator) writeGitLabArtifacts(results map[string]*drift.DriftResult, artifactDir string) error {
+func (crg *CIReportGenerator) writeGitLabArtifacts(results map[string]interfaces.DriftResult, artifactDir string) ([]Artifact, error) {
 	// Write GitLab merge request note
 	noteFile := filepath.Join(artifactDir, "gitlab-note.md")
-	note := ci.generateMarkdownSummary(results)
-	return os.WriteFile(noteFile, []byte(note), 0644)
+	// Convert to pointer results
+	pointerResults := make(map[string]*interfaces.DriftResult)
+	for k, v := range results {
+		vc := v
+		pointerResults[k] = &vc
+	}
+	note, err := crg.generateMarkdownSummary(pointerResults)
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(noteFile, []byte(note), 0644)
+	if err != nil {
+		return nil, WrapReportError(ErrorTypeFileOperation, "failed to write GitLab note", err)
+	}
+	info, err := os.Stat(noteFile)
+	if err != nil {
+		return nil, WrapReportError(ErrorTypeFileOperation, "failed to stat GitLab note", err)
+	}
+	return []Artifact{{
+		Path: noteFile,
+		Type: "gitlab-note-md",
+		Size: info.Size(),
+	}}, nil
 }
 
-func (ci *CIReportGenerator) writeJenkinsArtifacts(results map[string]*drift.DriftResult, artifactDir string) error {
+func (crg *CIReportGenerator) writeJenkinsArtifacts(results map[string]interfaces.DriftResult, artifactDir string) ([]Artifact, error) {
 	// Write Jenkins HTML report
 	htmlFile := filepath.Join(artifactDir, "jenkins-report.html")
-	html := ci.generateHTMLSummary(results)
-	return os.WriteFile(htmlFile, []byte(html), 0644)
+	// Convert to pointer results
+	pointerResults := make(map[string]*interfaces.DriftResult)
+	for k, v := range results {
+		vc := v
+		pointerResults[k] = &vc
+	}
+	html, err := crg.generateHTMLSummary(pointerResults)
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(htmlFile, []byte(html), 0644)
+	if err != nil {
+		return nil, WrapReportError(ErrorTypeFileOperation, "failed to write Jenkins HTML report", err)
+	}
+	info, err := os.Stat(htmlFile)
+	if err != nil {
+		return nil, WrapReportError(ErrorTypeFileOperation, "failed to stat Jenkins HTML report", err)
+	}
+	return []Artifact{{
+		Path: htmlFile,
+		Type: "jenkins-html-report",
+		Size: info.Size(),
+	}}, nil
 }
 
 // Summary generation helpers
 
-func (ci *CIReportGenerator) generateMarkdownSummary(results map[string]*drift.DriftResult) string {
-	summary := ci.generateCISummary(results)
+func (crg *CIReportGenerator) generateMarkdownSummary(results map[string]*interfaces.DriftResult) (string, error) {
+	summary := crg.buildCISummary(results)
 
-	md := fmt.Sprintf(`# Terraform Drift Detection Summary
-
-## Summary
-- **Total Resources**: %d
-- **Resources with Drift**: %d
-- **Total Differences**: %d
-
-## Severity Breakdown
-- 🔴 **Critical**: %d
-- 🟠 **High**: %d
-- 🟡 **Medium**: %d
-- 🔵 **Low**: %d
-
-`,
+	var md strings.Builder
+	md.WriteString(fmt.Sprintf("# Terraform Drift Detection Summary\n\n## Summary\n- **Total Resources**: %d\n- **Resources with Drift**: %d\n- **Total Differences**: %d\n\n## Severity Breakdown\n- 🔴 **Critical**: %d\n- 🟠 **High**: %d\n- 🟡 **Medium**: %d\n- 🔵 **Low**: %d\n",
 		summary.TotalResources,
 		summary.ResourcesWithDrift,
 		summary.TotalDifferences,
@@ -1008,19 +1097,19 @@ func (ci *CIReportGenerator) generateMarkdownSummary(results map[string]*drift.D
 		summary.SeverityCounts["high"],
 		summary.SeverityCounts["medium"],
 		summary.SeverityCounts["low"],
-	)
+	))
 
 	if summary.ResourcesWithDrift == 0 {
-		md += "## ✅ Result\n\nNo drift detected! All resources are in sync.\n"
+		md.WriteString("\n## ✅ Result\n\nNo drift detected! All resources are in sync.\n")
 	} else {
-		md += "## ⚠️ Action Requirred\n\nDrift detected in infrastructure. Review the detailed report and consider running `terraform plan` and `terraform apply`.\n"
+		md.WriteString("\n## ⚠️ Action Required\n\nDrift detected in infrastructure. Review the detailed report and consider running `terraform plan` and `terraform apply`.\n")
 	}
 
-	return md
+	return md.String(), nil
 }
 
-func (ci *CIReportGenerator) generateHTMLSummary(results map[string]*drift.DriftResult) string {
-	summary := ci.generateCISummary(results)
+func (crg *CIReportGenerator) generateHTMLSummary(results map[string]*interfaces.DriftResult) (string, error) {
+	summary := crg.buildCISummary(results)
 
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -1062,11 +1151,11 @@ func (ci *CIReportGenerator) generateHTMLSummary(results map[string]*drift.Drift
 		summary.SeverityCounts["medium"],
 		summary.SeverityCounts["low"],
 		time.Now().Format(time.RFC3339),
-	)
+	), nil
 }
 
 // generateCISummary creates a CI-focused summary with detailed counts
-func (ci *CIReportGenerator) generateCISummary(results map[string]*drift.DriftResult) CISummary {
+func (crg *CIReportGenerator) generateCISummary(results map[string]*interfaces.DriftResult) CISummary {
 	totalResources := len(results)
 	resourcesWithDrift := 0
 	totalDifferences := 0
@@ -1076,18 +1165,18 @@ func (ci *CIReportGenerator) generateCISummary(results map[string]*drift.DriftRe
 	lowCount := 0
 
 	for _, result := range results {
-		if result.HasDrift {
+		if result.IsDrifted {
 			resourcesWithDrift++
-			totalDifferences += len(result.Differences)
+			totalDifferences += len(result.DriftDetails)
 		}
-		switch result.OverallSeverity {
-		case drift.SeverityCritical:
+		switch result.Severity {
+		case interfaces.SeverityCritical:
 			criticalCount++
-		case drift.SeverityHigh:
+		case interfaces.SeverityHigh:
 			highCount++
-		case drift.SeverityMedium:
+		case interfaces.SeverityMedium:
 			mediumCount++
-		case drift.SeverityLow:
+		case interfaces.SeverityLow:
 			lowCount++
 		}
 	}

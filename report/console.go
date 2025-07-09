@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 // ANSI color codes for console output
@@ -45,7 +45,7 @@ func (crg *ConsoleReportGenerator) WithConfig(config *ReportConfig) ReportGenera
 }
 
 // GenerateReport generates a console-optimized report
-func (crg *ConsoleReportGenerator) GenerateReport(results map[string]*drift.DriftResult, config ReportConfig) ([]byte, error) {
+func (crg *ConsoleReportGenerator) GenerateReport(results map[string]*interfaces.DriftResult, config ReportConfig) ([]byte, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -83,19 +83,19 @@ func (crg *ConsoleReportGenerator) GenerateReport(results map[string]*drift.Drif
 }
 
 // GenerateJSONReport delegates to standard generator
-func (crg *ConsoleReportGenerator) GenerateJSONReport(results map[string]*drift.DriftResult) ([]byte, error) {
+func (crg *ConsoleReportGenerator) GenerateJSONReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
 	standardGen := NewStandardReportGenerator()
 	return standardGen.GenerateJSONReport(results)
 }
 
 // GenerateYAMLReport delegates to standard generator
-func (crg *ConsoleReportGenerator) GenerateYAMLReport(results map[string]*drift.DriftResult) ([]byte, error) {
+func (crg *ConsoleReportGenerator) GenerateYAMLReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
 	standardGen := NewStandardReportGenerator()
 	return standardGen.GenerateYAMLReport(results)
 }
 
 // GenerateTableReport generates a table with color coding
-func (crg *ConsoleReportGenerator) GenerateTableReport(results map[string]*drift.DriftResult) (string, error) {
+func (crg *ConsoleReportGenerator) GenerateTableReport(results map[string]*interfaces.DriftResult) (string, error) {
 	if results == nil {
 		return "", NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -110,13 +110,10 @@ func (crg *ConsoleReportGenerator) GenerateTableReport(results map[string]*drift
 	builder.WriteString(header + "\n")
 	builder.WriteString(crg.colorize(fmt.Sprintf("Generated: %s\n\n", time.Now().Format(time.RFC3339)), ColorDim))
 
-	// Summary with colors
-	summary := crg.generateColoredSummary(results)
-	builder.WriteString(summary)
-
-	// Detailed results
-	builder.WriteString(crg.colorize("\nDETAILED RESULTS:\n", ColorBold))
-	builder.WriteString(strings.Repeat("=", 80) + "\n")
+	// Table header
+	tableHeader := fmt.Sprintf("%-30s %-15s %-10s %-15s\n", "Resource ID", "Type", "Status", "Severity")
+	builder.WriteString(crg.colorize(tableHeader, ColorBold+ColorWhite))
+	builder.WriteString(crg.colorize(strings.Repeat("-", 70), ColorDim) + "\n")
 
 	// Sort results by resource ID for consistent output
 	var resourceIDs []string
@@ -125,16 +122,29 @@ func (crg *ConsoleReportGenerator) GenerateTableReport(results map[string]*drift
 	}
 	sort.Strings(resourceIDs)
 
+	// Table rows
 	for _, resourceID := range resourceIDs {
 		result := results[resourceID]
-		builder.WriteString(crg.formatResourceResult(result))
+		status := "No Drift"
+		statusColor := ColorGreen
+		if result.IsDrifted {
+			status = "Drift"
+			statusColor = crg.getSeverityColor(result.Severity)
+		}
+
+		row := fmt.Sprintf("%-30s %-15s %-10s %-15s\n",
+			result.ResourceID,
+			result.ResourceType,
+			crg.colorize(status, statusColor),
+			crg.colorize(string(result.Severity), crg.getSeverityColor(result.Severity)))
+		builder.WriteString(row)
 	}
 
 	return builder.String(), nil
 }
 
 // GenerateConsoleReport generates a console report with enhanced formatting
-func (crg *ConsoleReportGenerator) GenerateConsoleReport(results map[string]*drift.DriftResult) (string, error) {
+func (crg *ConsoleReportGenerator) GenerateConsoleReport(results map[string]*interfaces.DriftResult) (string, error) {
 	if results == nil {
 		return "", NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -165,7 +175,7 @@ func (crg *ConsoleReportGenerator) GenerateConsoleReport(results map[string]*dri
 
 	for _, resourceID := range resourceIDs {
 		result := results[resourceID]
-		builder.WriteString(crg.formatResourceResult(result))
+		builder.WriteString(crg.formatResourceResult(resourceID, result))
 	}
 
 	// Results by severity
@@ -193,19 +203,19 @@ func (crg *ConsoleReportGenerator) colorize(text, color string) string {
 }
 
 // getSeverityColor returns the appropriate color for a severity level
-func (crg *ConsoleReportGenerator) getSeverityColor(severity drift.DriftSeverity) string {
+func (crg *ConsoleReportGenerator) getSeverityColor(severity interfaces.SeverityLevel) string {
 	if !crg.colorEnabled {
 		return ""
 	}
 
 	switch severity {
-	case drift.SeverityCritical:
+	case interfaces.SeverityCritical:
 		return ColorRed + ColorBold
-	case drift.SeverityHigh:
+	case interfaces.SeverityHigh:
 		return ColorRed
-	case drift.SeverityMedium:
+	case interfaces.SeverityMedium:
 		return ColorYellow
-	case drift.SeverityLow:
+	case interfaces.SeverityLow:
 		return ColorBlue
 	default:
 		return ColorGreen
@@ -244,20 +254,20 @@ func (crg *ConsoleReportGenerator) generateCustomHeader(title string, colorEnabl
 }
 
 // generateSummarySection creates a summary section with custom color settings
-func (crg *ConsoleReportGenerator) generateSummarySection(results map[string]*drift.DriftResult, colorEnabled bool) string {
+func (crg *ConsoleReportGenerator) generateSummarySection(results map[string]*interfaces.DriftResult, colorEnabled bool) string {
 	var builder strings.Builder
 
 	totalResources := len(results)
 	resourcesWithDrift := 0
 	totalDifferences := 0
-	highestSeverity := drift.SeverityNone
+	highestSeverity := interfaces.SeverityNone
 
 	for _, result := range results {
-		if result.HasDrift {
+		if result.IsDrifted {
 			resourcesWithDrift++
-			totalDifferences += len(result.Differences)
-			if result.OverallSeverity > highestSeverity {
-				highestSeverity = result.OverallSeverity
+			totalDifferences += len(result.DriftDetails)
+			if result.Severity > highestSeverity {
+				highestSeverity = result.Severity
 			}
 		}
 	}
@@ -267,8 +277,8 @@ func (crg *ConsoleReportGenerator) generateSummarySection(results map[string]*dr
 	builder.WriteString(fmt.Sprintf("Resources with Drift: %d\n", resourcesWithDrift))
 	builder.WriteString(fmt.Sprintf("Resources without Drift: %d\n", totalResources-resourcesWithDrift))
 	builder.WriteString(fmt.Sprintf("Total Differences: %d\n", totalDifferences))
-	if highestSeverity != drift.SeverityNone {
-		builder.WriteString(fmt.Sprintf("Highest Severity: %s\n", highestSeverity.String()))
+	if highestSeverity != interfaces.SeverityNone {
+		builder.WriteString(fmt.Sprintf("Highest Severity: %s\n", string(highestSeverity)))
 	}
 
 	if colorEnabled {
@@ -278,7 +288,7 @@ func (crg *ConsoleReportGenerator) generateSummarySection(results map[string]*dr
 }
 
 // generateColoredSummary creates a summary with color coding
-func (crg *ConsoleReportGenerator) generateColoredSummary(results map[string]*drift.DriftResult) string {
+func (crg *ConsoleReportGenerator) generateColoredSummary(results map[string]*interfaces.DriftResult) string {
 	if len(results) == 0 {
 		var builder strings.Builder
 		builder.WriteString(crg.colorize("\n📊 SUMMARY:\n", ColorBold+ColorWhite))
@@ -293,14 +303,14 @@ func (crg *ConsoleReportGenerator) generateColoredSummary(results map[string]*dr
 	totalResources := len(results)
 	resourcesWithDrift := 0
 	totalDifferences := 0
-	severityCounts := make(map[drift.DriftSeverity]int)
+	severityCounts := make(map[interfaces.SeverityLevel]int)
 
 	for _, result := range results {
-		if result.HasDrift {
+		if result.IsDrifted {
 			resourcesWithDrift++
-			totalDifferences += len(result.Differences)
+			totalDifferences += len(result.DriftDetails)
 		}
-		severityCounts[result.OverallSeverity]++
+		severityCounts[result.Severity]++
 	}
 
 	builder.WriteString(crg.colorize("\n📊 SUMMARY:\n", ColorBold+ColorWhite))
@@ -317,11 +327,22 @@ func (crg *ConsoleReportGenerator) generateColoredSummary(results map[string]*dr
 	// Severity breakdown
 	if resourcesWithDrift > 0 {
 		builder.WriteString("\n🔍 SEVERITY BREAKDOWN:\n")
-		for severity := drift.SeverityCritical; severity >= drift.SeverityNone; severity-- {
-			if count := severityCounts[severity]; count > 0 {
-				severityText := fmt.Sprintf("   %s: %d", strings.Title(severity.String()), count)
-				builder.WriteString(crg.colorize(severityText, crg.getSeverityColor(severity)) + "\n")
-			}
+		// Show severity breakdown
+		if count := severityCounts[interfaces.SeverityCritical]; count > 0 {
+			severityText := fmt.Sprintf("   Critical: %d", count)
+			builder.WriteString(crg.colorize(severityText, crg.getSeverityColor(interfaces.SeverityCritical)) + "\n")
+		}
+		if count := severityCounts[interfaces.SeverityHigh]; count > 0 {
+			severityText := fmt.Sprintf("   High: %d", count)
+			builder.WriteString(crg.colorize(severityText, crg.getSeverityColor(interfaces.SeverityHigh)) + "\n")
+		}
+		if count := severityCounts[interfaces.SeverityMedium]; count > 0 {
+			severityText := fmt.Sprintf("   Medium: %d", count)
+			builder.WriteString(crg.colorize(severityText, crg.getSeverityColor(interfaces.SeverityMedium)) + "\n")
+		}
+		if count := severityCounts[interfaces.SeverityLow]; count > 0 {
+			severityText := fmt.Sprintf("   Low: %d", count)
+			builder.WriteString(crg.colorize(severityText, crg.getSeverityColor(interfaces.SeverityLow)) + "\n")
 		}
 	}
 
@@ -329,41 +350,41 @@ func (crg *ConsoleReportGenerator) generateColoredSummary(results map[string]*dr
 }
 
 // formatResourceResult formats a single resource result with colors
-func (crg *ConsoleReportGenerator) formatResourceResult(result *drift.DriftResult) string {
+func (crg *ConsoleReportGenerator) formatResourceResult(resourceKey string, result *interfaces.DriftResult) string {
 	var builder strings.Builder
 
 	// Resource header
-	resourceHeader := fmt.Sprintf("\n🔧 Resource: %s", result.ResourceID)
-	if result.HasDrift {
+	resourceHeader := fmt.Sprintf("\n🔧 Resource: %s", resourceKey)
+	if result.IsDrifted {
 		resourceHeader = crg.colorize(resourceHeader, ColorRed+ColorBold)
 	} else {
 		resourceHeader = crg.colorize(resourceHeader, ColorGreen+ColorBold)
 	}
 	builder.WriteString(resourceHeader + "\n")
 
-	if result.InstanceID != "" {
-		builder.WriteString(fmt.Sprintf("   Instance ID: %s\n", crg.colorize(result.InstanceID, ColorCyan)))
+	if result.ResourceID != "" {
+		builder.WriteString(fmt.Sprintf("   Instance ID: %s\n", crg.colorize(result.ResourceID, ColorCyan)))
 	}
 
 	// Status
 	status := "✅ No Drift"
 	statusColor := ColorGreen
-	if result.HasDrift {
-		status = fmt.Sprintf("❌ Drift Detected (%d differences)", len(result.Differences))
-		statusColor = crg.getSeverityColor(result.OverallSeverity)
+	if result.IsDrifted {
+		status = fmt.Sprintf("❌ Drift Detected (%d differences)", len(result.DriftDetails))
+		statusColor = crg.getSeverityColor(result.Severity)
 	}
 	builder.WriteString(fmt.Sprintf("   Status: %s\n", crg.colorize(status, statusColor)))
-	builder.WriteString(fmt.Sprintf("   Severity: %s\n", crg.colorize(result.OverallSeverity.String(), crg.getSeverityColor(result.OverallSeverity))))
-	builder.WriteString(fmt.Sprintf("   Checked: %s ago\n", time.Since(result.Timestamp).Round(time.Second)))
+	builder.WriteString(fmt.Sprintf("   Severity: %s\n", crg.colorize(string(result.Severity), crg.getSeverityColor(result.Severity))))
+	builder.WriteString(fmt.Sprintf("   Checked: %s ago\n", time.Since(result.DetectionTime).Round(time.Second)))
 
 	// Differences
-	if result.HasDrift {
+	if result.IsDrifted {
 		builder.WriteString(fmt.Sprintf("   %s:\n", crg.colorize("Differences", ColorYellow+ColorBold)))
-		for i, diff := range result.Differences {
-			builder.WriteString(fmt.Sprintf("     %d. %s\n", i+1, crg.colorize(diff.AttributeName, ColorWhite+ColorBold)))
+		for i, diff := range result.DriftDetails {
+			builder.WriteString(fmt.Sprintf("     %d. %s\n", i+1, crg.colorize(diff.Attribute, ColorWhite+ColorBold)))
 			builder.WriteString(fmt.Sprintf("        Expected: %s\n", crg.colorize(fmt.Sprintf("%v", diff.ExpectedValue), ColorGreen)))
 			builder.WriteString(fmt.Sprintf("        Actual:   %s\n", crg.colorize(fmt.Sprintf("%v", diff.ActualValue), ColorRed)))
-			builder.WriteString(fmt.Sprintf("        Severity: %s\n", crg.colorize(diff.Severity.String(), crg.getSeverityColor(diff.Severity))))
+			builder.WriteString(fmt.Sprintf("        Severity: %s\n", crg.colorize(string(diff.Severity), crg.getSeverityColor(diff.Severity))))
 			if diff.Description != "" {
 				builder.WriteString(fmt.Sprintf("        Description: %s\n", crg.colorize(diff.Description, ColorDim)))
 			}
@@ -405,14 +426,14 @@ func (crg *ConsoleReportGenerator) generateCustomProgressIndicator(progress, tot
 }
 
 // generateResultsBySeverity groups and displays results by severity
-func (crg *ConsoleReportGenerator) generateResultsBySeverity(results map[string]*drift.DriftResult) string {
+func (crg *ConsoleReportGenerator) generateResultsBySeverity(results map[string]*interfaces.DriftResult) string {
 	var builder strings.Builder
 
 	// Group by severity
-	severityGroups := make(map[drift.DriftSeverity][]*drift.DriftResult)
+	severityGroups := make(map[interfaces.SeverityLevel][]*interfaces.DriftResult)
 	for _, result := range results {
-		if result.HasDrift {
-			severityGroups[result.OverallSeverity] = append(severityGroups[result.OverallSeverity], result)
+		if result.IsDrifted {
+			severityGroups[result.Severity] = append(severityGroups[result.Severity], result)
 		}
 	}
 
@@ -422,15 +443,50 @@ func (crg *ConsoleReportGenerator) generateResultsBySeverity(results map[string]
 
 	builder.WriteString(crg.colorize("\n🎯 RESULTS BY SEVERITY:\n", ColorBold+ColorWhite))
 
-	for severity := drift.SeverityCritical; severity >= drift.SeverityLow; severity-- {
+	// Show results by severity in order
+	severities := []interfaces.SeverityLevel{interfaces.SeverityCritical, interfaces.SeverityHigh, interfaces.SeverityMedium, interfaces.SeverityLow}
+	for _, severity := range severities {
 		if resources := severityGroups[severity]; len(resources) > 0 {
-			severityHeader := fmt.Sprintf("\n   %s (%d resources):", strings.ToUpper(severity.String()), len(resources))
+			severityHeader := fmt.Sprintf("\n   %s (%d resources):", strings.ToUpper(string(severity)), len(resources))
 			builder.WriteString(crg.colorize(severityHeader, crg.getSeverityColor(severity)+ColorBold) + "\n")
 			for _, result := range resources {
-				builder.WriteString(fmt.Sprintf("     • %s (%d differences)\n", result.ResourceID, len(result.Differences)))
+				builder.WriteString(fmt.Sprintf("     • %s (%d differences)\n", result.ResourceID, len(result.DriftDetails)))
 			}
 		}
 	}
 
 	return builder.String()
+}
+
+// GenerateSimpleReport generates a simple console report without colors
+func (crg *ConsoleReportGenerator) GenerateSimpleReport(results map[string]*interfaces.DriftResult) (string, error) {
+	if results == nil {
+		return "", NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
+	}
+
+	var builder strings.Builder
+
+	// Header
+	builder.WriteString("DRIFT DETECTION REPORT\n")
+	builder.WriteString("Generated: " + time.Now().Format("2006-01-02 15:04:05 MST") + "\n\n")
+
+	// Summary
+	builder.WriteString(crg.generateSummarySection(results, false))
+
+	// Individual results
+	for _, result := range results {
+		builder.WriteString(fmt.Sprintf("\nResource: %s\n", result.ResourceID))
+		if result.IsDrifted {
+			builder.WriteString(fmt.Sprintf("Status: Drift Detected (%d differences)\n", len(result.DriftDetails)))
+			builder.WriteString(fmt.Sprintf("Severity: %s\n", string(result.Severity)))
+			for i, diff := range result.DriftDetails {
+				builder.WriteString(fmt.Sprintf("  %d. %s: %v -> %v\n", i+1, diff.Attribute, diff.ExpectedValue, diff.ActualValue))
+			}
+		} else {
+			builder.WriteString("Status: No Drift\n")
+		}
+		builder.WriteString("\n")
+	}
+
+	return builder.String(), nil
 }

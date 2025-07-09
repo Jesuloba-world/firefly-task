@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"firefly-task/pkg/interfaces"
 )
 
 // Parser provides a unified interface for parsing Terraform configurations and state files
 type Parser interface {
 	// ParseState parses a Terraform state file and returns extracted configurations
-	ParseState(statePath string) (map[string]*TerraformConfig, error)
+	ParseState(statePath string) (map[string]*interfaces.TerraformConfig, error)
 
 	// ParseHCL parses Terraform HCL configuration files and returns extracted configurations
-	ParseHCL(configPath string) (map[string]*TerraformConfig, error)
+	ParseHCL(configPath string) (map[string]*interfaces.TerraformConfig, error)
 
 	// ParseBoth parses both state and HCL files and merges the results
-	ParseBoth(statePath, configPath string) (map[string]*TerraformConfig, error)
+	ParseBoth(statePath, configPath string) (map[string]*interfaces.TerraformConfig, error)
 
 	// SetOptions configures parser behavior
 	SetOptions(options ParserOptions)
@@ -100,8 +102,7 @@ func (p *TerraformParser) ClearErrors() {
 }
 
 // ParseState parses a Terraform state file and returns extracted configurations
-func (p *TerraformParser) ParseState(statePath string) (map[string]*TerraformConfig, error) {
-	p.ClearErrors()
+func (p *TerraformParser) ParseState(statePath string) (map[string]*interfaces.TerraformConfig, error) {
 
 	// Validate file extension if strict mode is enabled
 	if p.options.StrictMode {
@@ -117,7 +118,7 @@ func (p *TerraformParser) ParseState(statePath string) (map[string]*TerraformCon
 			return nil, fmt.Errorf("failed to parse state file: %w", err)
 		}
 		p.errors = append(p.errors, err)
-		return make(map[string]*TerraformConfig), nil
+		return make(map[string]*interfaces.TerraformConfig), nil
 	}
 
 	// Extract EC2 instances
@@ -127,7 +128,7 @@ func (p *TerraformParser) ParseState(statePath string) (map[string]*TerraformCon
 	}
 
 	// Convert to TerraformConfig map
-	configs := make(map[string]*TerraformConfig)
+	configs := make(map[string]*interfaces.TerraformConfig)
 	for _, instance := range instances {
 		config := p.convertEC2InstanceToTerraformConfig(instance)
 
@@ -143,7 +144,7 @@ func (p *TerraformParser) ParseState(statePath string) (map[string]*TerraformCon
 }
 
 // ParseHCL parses Terraform HCL configuration files and returns extracted configurations
-func (p *TerraformParser) ParseHCL(configPath string) (map[string]*TerraformConfig, error) {
+func (p *TerraformParser) ParseHCL(configPath string) (map[string]*interfaces.TerraformConfig, error) {
 	p.ClearErrors()
 
 	// Parse the HCL configuration
@@ -153,7 +154,7 @@ func (p *TerraformParser) ParseHCL(configPath string) (map[string]*TerraformConf
 			return nil, fmt.Errorf("failed to parse HCL configuration: %w", err)
 		}
 		p.errors = append(p.errors, err)
-		return make(map[string]*TerraformConfig), nil
+		return make(map[string]*interfaces.TerraformConfig), nil
 	}
 
 	// Extract EC2 instances
@@ -163,7 +164,7 @@ func (p *TerraformParser) ParseHCL(configPath string) (map[string]*TerraformConf
 	}
 
 	// Convert to TerraformConfig map
-	configs := make(map[string]*TerraformConfig)
+	configs := make(map[string]*interfaces.TerraformConfig)
 	for _, instance := range instances {
 		config := p.convertEC2InstanceToTerraformConfig(instance)
 		configs[config.ResourceID] = config
@@ -173,7 +174,7 @@ func (p *TerraformParser) ParseHCL(configPath string) (map[string]*TerraformConf
 }
 
 // ParseBoth parses both state and HCL files and merges the results
-func (p *TerraformParser) ParseBoth(statePath, configPath string) (map[string]*TerraformConfig, error) {
+func (p *TerraformParser) ParseBoth(statePath, configPath string) (map[string]*interfaces.TerraformConfig, error) {
 	p.ClearErrors()
 
 	// Parse state file
@@ -189,7 +190,7 @@ func (p *TerraformParser) ParseBoth(statePath, configPath string) (map[string]*T
 	}
 
 	// Merge configurations (state takes precedence for actual values)
-	mergedConfigs := make(map[string]*TerraformConfig)
+	mergedConfigs := make(map[string]*interfaces.TerraformConfig)
 
 	// Start with HCL configurations (expected values)
 	for id, config := range hclConfigs {
@@ -211,38 +212,29 @@ func (p *TerraformParser) ParseBoth(statePath, configPath string) (map[string]*T
 }
 
 // convertEC2InstanceToTerraformConfig converts EC2InstanceConfig to TerraformConfig
-func (p *TerraformParser) convertEC2InstanceToTerraformConfig(instance EC2InstanceConfig) *TerraformConfig {
-	config := &TerraformConfig{
-		ResourceID:     fmt.Sprintf("aws_instance.%s", instance.ResourceName),
-		ResourceName:   instance.ResourceName,
-		InstanceType:   instance.InstanceType,
-		AMI:            instance.AMI,
-		KeyName:        instance.KeyName,
-		SubnetID:       instance.SubnetID,
-		SecurityGroups: instance.VPCSecurityGroups,
-		Tags:           instance.Tags,
+func (p *TerraformParser) convertEC2InstanceToTerraformConfig(instance EC2InstanceConfig) *interfaces.TerraformConfig {
+	config := &interfaces.TerraformConfig{
+		ResourceID:   fmt.Sprintf("aws_instance.%s", instance.ResourceName),
+		ResourceName: instance.ResourceName,
+		ResourceType: "aws_instance",
+		Attributes: map[string]interface{}{
+			"instance_type": instance.InstanceType,
+			"ami":           instance.AMI,
+			"key_name":      instance.KeyName,
+			"subnet_id":     instance.SubnetID,
+			"vpc_security_group_ids": instance.VPCSecurityGroups,
+			"tags":          instance.Tags,
+		},
 	}
 
 	return config
 }
 
 // mergeStateIntoConfig merges state configuration into HCL configuration
-func (p *TerraformParser) mergeStateIntoConfig(hclConfig, stateConfig *TerraformConfig) {
-	// Update with actual values from state
-	if stateConfig.InstanceID != "" {
-		hclConfig.InstanceID = stateConfig.InstanceID
-	}
-	if stateConfig.PrivateIP != "" {
-		hclConfig.PrivateIP = stateConfig.PrivateIP
-	}
-	if stateConfig.PublicIP != "" {
-		hclConfig.PublicIP = stateConfig.PublicIP
-	}
-	if stateConfig.AvailabilityZone != "" {
-		hclConfig.AvailabilityZone = stateConfig.AvailabilityZone
-	}
-	if stateConfig.VPCID != "" {
-		hclConfig.VPCID = stateConfig.VPCID
+func (p *TerraformParser) mergeStateIntoConfig(hclConfig, stateConfig *interfaces.TerraformConfig) {
+	// Merge attributes from state
+	for key, value := range stateConfig.Attributes {
+		hclConfig.Attributes[key] = value
 	}
 
 	// Merge metadata

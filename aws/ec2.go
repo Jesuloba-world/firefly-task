@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"firefly-task/pkg/interfaces"
+
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
@@ -21,7 +23,7 @@ var (
 )
 
 // GetEC2Instance retrieves a single EC2 instance by its ID with retry logic
-func (c *Client) GetEC2Instance(ctx context.Context, instanceID string) (*EC2Instance, error) {
+func (c *Client) GetEC2Instance(ctx context.Context, instanceID string) (*interfaces.EC2Instance, error) {
 	if instanceID == "" {
 		return nil, ErrInvalidInstanceID
 	}
@@ -150,9 +152,9 @@ func isRetryableError(err error) bool {
 }
 
 // GetMultipleEC2Instances retrieves multiple EC2 instances by their IDs with retry logic
-func (c *Client) GetMultipleEC2Instances(ctx context.Context, instanceIDs []string) (map[string]*EC2Instance, error) {
+func (c *Client) GetMultipleEC2Instances(ctx context.Context, instanceIDs []string) (map[string]*interfaces.EC2Instance, error) {
 	if len(instanceIDs) == 0 {
-		return make(map[string]*EC2Instance), nil
+		return make(map[string]*interfaces.EC2Instance), nil
 	}
 
 	c.logger.Debugf("Retrieving %d EC2 instances", len(instanceIDs))
@@ -175,7 +177,7 @@ func (c *Client) GetMultipleEC2Instances(ctx context.Context, instanceIDs []stri
 	}
 
 	// Process the results
-	result := make(map[string]*EC2Instance)
+	result := make(map[string]*interfaces.EC2Instance)
 	for _, reservation := range resp.Reservations {
 		for _, awsInstance := range reservation.Instances {
 			instance := convertFromAWSInstance(awsInstance)
@@ -188,8 +190,8 @@ func (c *Client) GetMultipleEC2Instances(ctx context.Context, instanceIDs []stri
 }
 
 // convertFromAWSInstance converts AWS SDK EC2 Instance to our EC2Instance model
-func convertFromAWSInstance(awsInstance types.Instance) *EC2Instance {
-	instance := &EC2Instance{
+func convertFromAWSInstance(awsInstance types.Instance) *interfaces.EC2Instance {
+	instance := &interfaces.EC2Instance{
 		InstanceID:       *awsInstance.InstanceId,
 		InstanceType:     string(awsInstance.InstanceType),
 		State:            string(awsInstance.State.Name),
@@ -234,7 +236,7 @@ func convertFromAWSInstance(awsInstance types.Instance) *EC2Instance {
 
 	// Convert security groups
 	for _, sg := range awsInstance.SecurityGroups {
-		instance.SecurityGroups = append(instance.SecurityGroups, SecurityGroup{
+		instance.SecurityGroups = append(instance.SecurityGroups, interfaces.SecurityGroup{
 			GroupID:   *sg.GroupId,
 			GroupName: *sg.GroupName,
 		})

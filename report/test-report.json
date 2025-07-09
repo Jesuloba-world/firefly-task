@@ -9,96 +9,71 @@
       "low": 1,
       "medium": 1
     },
-    "generation_time": "2025-07-04T13:29:02+01:00",
+    "generation_time": "2025-07-09T23:31:58+01:00",
     "overall_status": "DRIFT_DETECTED",
-    "highest_severity": "critical"
+    "highest_severity": "high"
   },
   "results": {
     "aws_db_instance.database": {
-      "resource_id": "aws_db_instance.database",
-      "instance_id": "i-fedcba9876543210",
+      "resource_id": "i-fedcba9876543210",
       "resource_type": "aws_db_instance",
-      "detection_time": "0001-01-01T00:00:00Z",
-      "has_drift": false,
-      "drifted_attributes": [],
-      "differences": [],
-      "checked_attributes": [],
-      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
-      "overall_severity": 1
+      "is_drifted": false,
+      "detection_time": "2025-07-09T23:31:58.2793409+01:00",
+      "drift_details": [],
+      "severity": "low"
     },
     "aws_instance.web-server-1": {
-      "resource_id": "aws_instance.web-server-1",
-      "instance_id": "i-1234567890abcdef0",
+      "resource_id": "i-1234567890abcdef0",
       "resource_type": "aws_instance",
-      "detection_time": "0001-01-01T00:00:00Z",
-      "has_drift": true,
-      "drifted_attributes": [
-        "instance_type"
-      ],
-      "differences": [
+      "is_drifted": true,
+      "detection_time": "2025-07-09T23:31:58.2793409+01:00",
+      "drift_details": [
         {
-          "attribute_name": "instance_type",
-          "actual_value": "t2.small",
+          "attribute": "instance_type",
           "expected_value": "t2.micro",
-          "difference_type": "",
-          "description": "",
-          "severity": 2
+          "actual_value": "t2.small",
+          "drift_type": "",
+          "severity": "medium"
         }
       ],
-      "checked_attributes": [],
-      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
-      "overall_severity": 2
+      "severity": "medium"
     },
     "aws_instance.web-server-2": {
-      "resource_id": "aws_instance.web-server-2",
-      "instance_id": "i-abcdef1234567890",
+      "resource_id": "i-abcdef1234567890",
       "resource_type": "aws_instance",
-      "detection_time": "0001-01-01T00:00:00Z",
-      "has_drift": true,
-      "drifted_attributes": [
-        "security_groups"
-      ],
-      "differences": [
+      "is_drifted": true,
+      "detection_time": "2025-07-09T23:31:58.2793409+01:00",
+      "drift_details": [
         {
-          "attribute_name": "security_groups",
-          "actual_value": "sg-5678",
+          "attribute": "security_groups",
           "expected_value": "sg-1234",
-          "difference_type": "",
-          "description": "",
-          "severity": 4
+          "actual_value": "sg-5678",
+          "drift_type": "",
+          "severity": "critical"
         }
       ],
-      "checked_attributes": [],
-      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
-      "overall_severity": 4
+      "severity": "critical"
     },
     "aws_lb.main": {
-      "resource_id": "aws_lb.main",
-      "instance_id": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
+      "resource_id": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
       "resource_type": "aws_lb",
-      "detection_time": "0001-01-01T00:00:00Z",
-      "has_drift": true,
-      "drifted_attributes": [
-        "publicly_accessible"
-      ],
-      "differences": [
+      "is_drifted": true,
+      "detection_time": "2025-07-09T23:31:58.2793409+01:00",
+      "drift_details": [
         {
-          "attribute_name": "publicly_accessible",
-          "actual_value": "false",
+          "attribute": "publicly_accessible",
           "expected_value": "true",
-          "difference_type": "",
-          "description": "",
-          "severity": 3
+          "actual_value": "false",
+          "drift_type": "",
+          "severity": "high"
         }
       ],
-      "checked_attributes": [],
-      "timestamp": "2025-07-04T13:29:02.7258997+01:00",
-      "overall_severity": 3
+      "severity": "high"
     }
   },
   "metadata": {
     "generator_version": "1.0.0",
     "report_format": "standard"
   },
-  "timestamp": "2025-07-04T13:29:02+01:00"
+  "timestamp": "2025-07-09T23:31:58+01:00"
 }

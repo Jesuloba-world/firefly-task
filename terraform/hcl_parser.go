@@ -100,62 +100,14 @@ func ExtractEC2Instances(config *ParsedTerraformConfig) ([]EC2InstanceConfig, er
 
 	for _, resource := range config.Resources {
 		if resource.Type == "aws_instance" {
+			// Note: terraform-config-inspect doesn't expose detailed config attributes
+			// We create a basic instance config with the resource name
 			instance := EC2InstanceConfig{
 				ResourceName: resource.Name,
-			}
-
-			// Extract configuration values
-			if instanceType, ok := resource.Config["instance_type"]; ok {
-				if str, ok := instanceType.(string); ok {
-					instance.InstanceType = str
-				}
-			}
-
-			if ami, ok := resource.Config["ami"]; ok {
-				if str, ok := ami.(string); ok {
-					instance.AMI = str
-				}
-			}
-
-			if subnetID, ok := resource.Config["subnet_id"]; ok {
-				if str, ok := subnetID.(string); ok {
-					instance.SubnetID = str
-				}
-			}
-
-			if keyName, ok := resource.Config["key_name"]; ok {
-				if str, ok := keyName.(string); ok {
-					instance.KeyName = str
-				}
-			}
-
-			if userData, ok := resource.Config["user_data"]; ok {
-				if str, ok := userData.(string); ok {
-					instance.UserData = str
-				}
-			}
-
-			// Handle security groups
-			if secGroups, ok := resource.Config["vpc_security_group_ids"]; ok {
-				if slice, ok := secGroups.([]interface{}); ok {
-					for _, sg := range slice {
-						if str, ok := sg.(string); ok {
-							instance.VPCSecurityGroups = append(instance.VPCSecurityGroups, str)
-						}
-					}
-				}
-			}
-
-			// Handle tags
-			if tags, ok := resource.Config["tags"]; ok {
-				if tagMap, ok := tags.(map[string]interface{}); ok {
-					instance.Tags = make(map[string]string)
-					for k, v := range tagMap {
-						if str, ok := v.(string); ok {
-							instance.Tags[k] = str
-						}
-					}
-				}
+				// Set default values since config details aren't available
+				InstanceType: "unknown", // Will be populated from state file if available
+				AMI:          "unknown", // Will be populated from state file if available
+				Tags:         make(map[string]string),
 			}
 
 			instances = append(instances, instance)

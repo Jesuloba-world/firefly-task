@@ -11,7 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 // StandardReportGenerator implements the ReportGenerator interface
@@ -33,13 +33,13 @@ func (srg *StandardReportGenerator) WithConfig(config *ReportConfig) ReportGener
 }
 
 // GenerateReport generates a report based on the configured format
-func (srg *StandardReportGenerator) GenerateReport(results map[string]*drift.DriftResult, config ReportConfig) ([]byte, error) {
+func (srg *StandardReportGenerator) GenerateReport(results map[string]*interfaces.DriftResult, config ReportConfig) ([]byte, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
 
 	// Apply filters
-	filteredResults, err := srg.filterResults(results, config.FilterSeverity)
+	filteredResults, err := srg.filterResults(results, interfaces.SeverityLevel(config.FilterSeverity))
 	if err != nil {
 		return nil, WrapError(ErrorTypeFilterError, "failed to filter results", err)
 	}
@@ -67,7 +67,7 @@ func (srg *StandardReportGenerator) GenerateReport(results map[string]*drift.Dri
 }
 
 // GenerateJSONReport generates a JSON format report
-func (srg *StandardReportGenerator) GenerateJSONReport(results map[string]*drift.DriftResult) ([]byte, error) {
+func (srg *StandardReportGenerator) GenerateJSONReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -83,7 +83,7 @@ func (srg *StandardReportGenerator) GenerateJSONReport(results map[string]*drift
 }
 
 // GenerateYAMLReport generates a YAML format report
-func (srg *StandardReportGenerator) GenerateYAMLReport(results map[string]*drift.DriftResult) ([]byte, error) {
+func (srg *StandardReportGenerator) GenerateYAMLReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
 	if results == nil {
 		return nil, NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -99,7 +99,7 @@ func (srg *StandardReportGenerator) GenerateYAMLReport(results map[string]*drift
 }
 
 // GenerateTableReport generates a table format report
-func (srg *StandardReportGenerator) GenerateTableReport(results map[string]*drift.DriftResult) (string, error) {
+func (srg *StandardReportGenerator) GenerateTableReport(results map[string]*interfaces.DriftResult) (string, error) {
 	if results == nil {
 		return "", NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -150,14 +150,14 @@ func (srg *StandardReportGenerator) GenerateTableReport(results map[string]*drif
 	for _, resourceID := range resourceIDs {
 		result := results[resourceID]
 		driftStatus := srg.getDriftStatus(result)
-		severity := strings.ToUpper(result.OverallSeverity.String())
+		severity := strings.ToUpper(string(result.Severity))
 		
 		// Format differences
 		var differences string
-		if result.HasDrift {
+		if result.IsDrifted {
 			var diffNames []string
-			for _, diff := range result.Differences {
-				diffNames = append(diffNames, diff.AttributeName)
+			for _, diff := range result.DriftDetails {
+				diffNames = append(diffNames, diff.Attribute)
 			}
 			differences = strings.Join(diffNames, ", ")
 			if len(differences) > 47 {
@@ -167,7 +167,7 @@ func (srg *StandardReportGenerator) GenerateTableReport(results map[string]*drif
 			differences = "None"
 		}
 
-		builder.WriteString(fmt.Sprintf(rowFormat, result.ResourceID, driftStatus, severity, differences))
+		builder.WriteString(fmt.Sprintf(rowFormat, resourceID, driftStatus, severity, differences))
 	}
 
 	builder.WriteString(strings.Repeat("=", 120) + "\n")
@@ -176,7 +176,7 @@ func (srg *StandardReportGenerator) GenerateTableReport(results map[string]*drif
 }
 
 // GenerateConsoleReport generates a console report with color formatting
-func (srg *StandardReportGenerator) GenerateConsoleReport(results map[string]*drift.DriftResult) (string, error) {
+func (srg *StandardReportGenerator) GenerateConsoleReport(results map[string]*interfaces.DriftResult) (string, error) {
 	if results == nil {
 		return "", NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -212,7 +212,7 @@ func (srg *StandardReportGenerator) WriteToFile(content []byte, filePath string)
 // Helper methods
 
 // buildReportData creates the complete report data structure
-func (srg *StandardReportGenerator) buildReportData(results map[string]*drift.DriftResult) *ReportData {
+func (srg *StandardReportGenerator) buildReportData(results map[string]*interfaces.DriftResult) *ReportData {
 	summary := srg.generateSummary(results)
 
 
@@ -235,31 +235,33 @@ func (srg *StandardReportGenerator) buildReportData(results map[string]*drift.Dr
 }
 
 // generateSummary creates summary statistics from the results
-func (srg *StandardReportGenerator) generateSummary(results map[string]*drift.DriftResult) ReportSummary {
+func (srg *StandardReportGenerator) generateSummary(results map[string]*interfaces.DriftResult) ReportSummary {
 	totalResources := len(results)
 	resourcesWithDrift := 0
 	totalDifferences := 0
 	severityCounts := make(map[string]int)
-	highestSeverity := drift.SeverityNone
+	highestSeverity := interfaces.SeverityLow
 
 	for _, result := range results {
-		if result.HasDrift {
+		if result.IsDrifted {
 			resourcesWithDrift++
-			totalDifferences += len(result.Differences)
+			totalDifferences += len(result.DriftDetails)
 			
 			// Count individual difference severities and track highest
-			for _, diff := range result.Differences {
-				severityStr := diff.Severity.String()
+			for _, detail := range result.DriftDetails {
+				severityStr := string(detail.Severity)
 				severityCounts[severityStr]++
 				
 				// Track highest severity
-				if diff.Severity > highestSeverity {
-					highestSeverity = diff.Severity
+				if detail.Severity == interfaces.SeverityHigh {
+					highestSeverity = interfaces.SeverityHigh
+				} else if detail.Severity == interfaces.SeverityMedium && highestSeverity != interfaces.SeverityHigh {
+					highestSeverity = interfaces.SeverityMedium
 				}
 			}
 		} else {
 			// Count resources without drift as "low" severity
-			severityStr := result.OverallSeverity.String()
+			severityStr := string(result.Severity)
 			severityCounts[severityStr]++
 		}
 	}
@@ -276,7 +278,7 @@ func (srg *StandardReportGenerator) generateSummary(results map[string]*drift.Dr
 		SeverityCounts:     severityCounts,
 		GenerationTime:     time.Now().Format(time.RFC3339),
 		OverallStatus:      overallStatus,
-		HighestSeverity:    highestSeverity.String(),
+		HighestSeverity:    string(highestSeverity),
 	}
 }
 
@@ -284,15 +286,34 @@ func (srg *StandardReportGenerator) generateSummary(results map[string]*drift.Dr
 
 
 
+// getSeverityOrder returns the numeric order of severity levels for comparison
+func getSeverityOrder(severity interfaces.SeverityLevel) int {
+	switch severity {
+	case interfaces.SeverityLow:
+		return 1
+	case interfaces.SeverityMedium:
+		return 2
+	case interfaces.SeverityHigh:
+		return 3
+	case interfaces.SeverityCritical:
+		return 4
+	default:
+		return 0
+	}
+}
+
 // filterResults filters results based on minimum severity level
-func (srg *StandardReportGenerator) filterResults(results map[string]*drift.DriftResult, minSeverity drift.DriftSeverity) (map[string]*drift.DriftResult, error) {
-	if minSeverity == drift.SeverityNone {
+func (srg *StandardReportGenerator) filterResults(results map[string]*interfaces.DriftResult, minSeverity interfaces.SeverityLevel) (map[string]*interfaces.DriftResult, error) {
+	if minSeverity == interfaces.SeverityLow {
 		return results, nil
 	}
 
-	filteredResults := make(map[string]*drift.DriftResult)
+	filteredResults := make(map[string]*interfaces.DriftResult)
+	minSeverityOrder := getSeverityOrder(minSeverity)
+	
 	for resourceID, result := range results {
-		if result.OverallSeverity >= minSeverity {
+		// Use numeric comparison for severity filtering
+		if getSeverityOrder(result.Severity) >= minSeverityOrder {
 			filteredResults[resourceID] = result
 		}
 	}
@@ -301,9 +322,9 @@ func (srg *StandardReportGenerator) filterResults(results map[string]*drift.Drif
 }
 
 // getDriftStatus returns a human-readable drift status
-func (srg *StandardReportGenerator) getDriftStatus(result *drift.DriftResult) string {
-	if !result.HasDrift {
+func (srg *StandardReportGenerator) getDriftStatus(result *interfaces.DriftResult) string {
+	if !result.IsDrifted {
 		return "NO DRIFT"
 	}
-	return fmt.Sprintf("DRIFT DETECTED (%d differences)", len(result.Differences))
+	return fmt.Sprintf("DRIFT DETECTED (%d differences)", len(result.DriftDetails))
 }

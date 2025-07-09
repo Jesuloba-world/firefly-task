@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 
@@ -38,7 +38,7 @@ func TestNewReportConfig(t *testing.T) {
 	assert.True(t, config.IncludeTimestamp)
 	assert.True(t, config.IncludeSummary)
 	assert.True(t, config.ColorOutput)
-	assert.Equal(t, drift.SeverityNone, config.FilterSeverity)
+	assert.Equal(t, interfaces.SeverityNone, config.FilterSeverity)
 
 	assert.False(t, config.ShowProgressIndicator)
 }
@@ -60,8 +60,8 @@ func TestReportConfig_WithColor(t *testing.T) {
 }
 
 func TestReportConfig_WithFilterSeverity(t *testing.T) {
-	config := NewReportConfig().WithFilterSeverity(drift.SeverityHigh)
-	assert.Equal(t, drift.SeverityHigh, config.FilterSeverity)
+	config := NewReportConfig().WithFilterSeverity(interfaces.SeverityHigh)
+	assert.Equal(t, interfaces.SeverityHigh, config.FilterSeverity)
 }
 
 func TestReportConfig_WithColorOutput(t *testing.T) {
@@ -75,13 +75,13 @@ func TestReportConfig_Chaining(t *testing.T) {
 		WithFormat(FormatTable).
 		WithOutputFile("report.txt").
 		WithColor(true).
-		WithFilterSeverity(drift.SeverityMedium).
+		WithFilterSeverity(interfaces.SeverityMedium).
 		WithColorOutput(false)
 
 	assert.Equal(t, FormatTable, config.Format)
 	assert.Equal(t, "report.txt", config.OutputFile)
 	assert.True(t, config.Color)
-	assert.Equal(t, drift.SeverityMedium, config.FilterSeverity)
+	assert.Equal(t, interfaces.SeverityMedium, config.FilterSeverity)
 	assert.False(t, config.ColorOutput)
 }
 
@@ -145,7 +145,7 @@ func BenchmarkReportConfig_Chaining(b *testing.B) {
 		_ = NewReportConfig().
 			WithFormat(FormatYAML).
 			WithColor(true).
-			WithFilterSeverity(drift.SeverityHigh)
+			WithFilterSeverity(interfaces.SeverityHigh)
 	}
 }
 
@@ -156,13 +156,13 @@ func TestReportConfig_EdgeCases(t *testing.T) {
 	assert.Equal(t, "", config.OutputFile)
 
 	// Test with invalid severity (should still work)
-	config = NewReportConfig().WithFilterSeverity(drift.DriftSeverity(999))
-	assert.Equal(t, drift.DriftSeverity(999), config.FilterSeverity)
+	config = NewReportConfig().WithFilterSeverity(interfaces.SeverityLevel("invalid"))
+	assert.Equal(t, interfaces.SeverityLevel("invalid"), config.FilterSeverity)
 }
 
 func TestReportSummary_EdgeCases(t *testing.T) {
 	// Test with empty results
-	emptyResults := make(map[string]*drift.DriftResult)
+	emptyResults := make(map[string]*interfaces.DriftResult)
 
 	summary := &ReportSummary{
 		TotalResources:     0,

@@ -9,6 +9,7 @@ import (
 
 	"firefly-task/aws"
 	"firefly-task/terraform"
+	"firefly-task/pkg/interfaces"
 )
 
 // DetectionConfig holds configuration for drift detection
@@ -95,7 +96,7 @@ func NewDriftDetector(config DetectionConfig) *DriftDetector {
 }
 
 // DetectDrift compares an AWS resource with its Terraform configuration
-func (d *DriftDetector) DetectDrift(awsResource interface{}, terraformConfig interface{}) (*DriftResult, error) {
+func (d *DriftDetector) DetectDrift(awsResource interface{}, terraformConfig interface{}) (*interfaces.DriftResult, error) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -115,11 +116,11 @@ func (d *DriftDetector) DetectDrift(awsResource interface{}, terraformConfig int
 	}
 
 	// Perform drift detection
-	result := &DriftResult{
+	result := &interfaces.DriftResult{
 		ResourceID:    d.extractResourceID(awsResource),
 		ResourceType:  d.extractResourceType(awsResource),
 		DetectionTime: time.Now(),
-		Differences:   []AttributeDifference{},
+		DriftDetails:   []*interfaces.DriftDetail{},
 	}
 
 	// Get all unique attribute names
@@ -140,53 +141,94 @@ func (d *DriftDetector) DetectDrift(awsResource interface{}, terraformConfig int
 		}
 
 		if !awsExists {
-			result.Differences = append(result.Differences, AttributeDifference{
-				AttributeName: attrName,
+			result.DriftDetails = append(result.DriftDetails, &interfaces.DriftDetail{
+				Attribute:     attrName,
 				ActualValue:   nil,
 				ExpectedValue: terraformValue,
-				Severity:      SeverityMedium,
 				Description:   fmt.Sprintf("Attribute '%s' missing in AWS resource but present in Terraform configuration", attrName),
 			})
 			continue
 		}
 
 		if !terraformExists {
-			result.Differences = append(result.Differences, AttributeDifference{
-				AttributeName: attrName,
-				ActualValue:   awsValue,
-				ExpectedValue: nil,
-				Severity:      SeverityLow,
-				Description:   fmt.Sprintf("Attribute '%s' present in AWS resource but missing in Terraform configuration", attrName),
-			})
-			continue
-		}
+				result.DriftDetails = append(result.DriftDetails, &interfaces.DriftDetail{
+					Attribute:     attrName,
+					ActualValue:   awsValue,
+					ExpectedValue: nil,
+					Severity:      interfaces.SeverityLow,
+					Description:   fmt.Sprintf("Attribute '%s' present in AWS resource but missing in Terraform configuration", attrName),
+				})
+				continue
+			}
 
 		// Compare attribute values
 		config := d.getAttributeConfig(attrName)
 		isEqual, description := CompareValues(awsValue, terraformValue, config)
 
 		if !isEqual {
-			severity := d.determineSeverity(attrName, awsValue, terraformValue)
-			result.Differences = append(result.Differences, AttributeDifference{
-				AttributeName: attrName,
+			severity := d.determineSeverity(d.toSnakeCase(attrName), awsValue, terraformValue)
+			result.DriftDetails = append(result.DriftDetails, &interfaces.DriftDetail{
+				Attribute:     attrName,
 				ActualValue:   awsValue,
 				ExpectedValue: terraformValue,
-				Severity:      severity,
+				Severity:      toSeverityLevel(severity),
 				Description:   description,
 			})
 		}
 	}
 
 	// Determine overall drift status
-	result.HasDrift = len(result.Differences) > 0
-	if result.HasDrift {
-		result.OverallSeverity = result.GetHighestSeverity()
+	result.IsDrifted = len(result.DriftDetails) > 0
+	if result.IsDrifted {
+		highestSeverity := interfaces.SeverityNone
+		for _, detail := range result.DriftDetails {
+			if severityValue(detail.Severity) > severityValue(highestSeverity) {
+				highestSeverity = detail.Severity
+			}
+		}
+		result.Severity = highestSeverity
 	} else {
-		result.OverallSeverity = SeverityNone
+		result.Severity = interfaces.SeverityNone
 	}
 
 	return result, nil
 }
+
+func toSeverityLevel(s DriftSeverity) interfaces.SeverityLevel {
+	switch s {
+	case SeverityCritical:
+		return interfaces.SeverityCritical
+	case SeverityHigh:
+		return interfaces.SeverityHigh
+	case SeverityMedium:
+		return interfaces.SeverityMedium
+	case SeverityLow:
+		return interfaces.SeverityLow
+	default:
+		return interfaces.SeverityNone
+	}
+}
+
+// severityValue returns a numeric value for severity comparison
+func severityValue(s interfaces.SeverityLevel) int {
+	switch s {
+	case interfaces.SeverityCritical:
+		return 4
+	case interfaces.SeverityHigh:
+		return 3
+	case interfaces.SeverityMedium:
+		return 2
+	case interfaces.SeverityLow:
+		return 1
+	case interfaces.SeverityNone:
+		return 0
+	default:
+		return 0
+	}
+}
+
+
+
 
 func (d *DriftDetector) toSnakeCase(str string) string {
 	var result []rune
@@ -204,7 +246,7 @@ func (d *DriftDetector) toSnakeCase(str string) string {
 }
 
 // DetectDriftBatch performs drift detection on multiple resource pairs concurrently
-func (d *DriftDetector) DetectDriftBatch(resourcePairs []ResourcePair) ([]*DriftResult, error) {
+func (d *DriftDetector) DetectDriftBatch(resourcePairs []ResourcePair) ([]*interfaces.DriftResult, error) {
 	d.mu.RLock()
 	maxConcurrency := d.config.MaxConcurrency
 	d.mu.RUnlock()
@@ -249,7 +291,7 @@ func (d *DriftDetector) DetectDriftBatch(resourcePairs []ResourcePair) ([]*Drift
 	}()
 
 	// Process results
-	results := make([]*DriftResult, len(resourcePairs))
+	results := make([]*interfaces.DriftResult, len(resourcePairs))
 	var errors []error
 
 	for batchResult := range resultChan {
@@ -290,7 +332,7 @@ type ResourcePair struct {
 
 type BatchResult struct {
 	Index  int
-	Result *DriftResult
+	Result *interfaces.DriftResult
 	Error  error
 }
 
@@ -323,6 +365,24 @@ func (d *DriftDetector) ec2InstanceToMap(instance *aws.EC2Instance) map[string]i
 	if instance.ImageID != nil {
 		m["ami"] = *instance.ImageID
 	}
+	if instance.PublicIPAddress != nil {
+		m["public_ip"] = *instance.PublicIPAddress
+	}
+	if instance.PrivateIPAddress != nil {
+		m["private_ip"] = *instance.PrivateIPAddress
+	}
+	if instance.SubnetID != nil {
+		m["subnet_id"] = *instance.SubnetID
+	}
+	if instance.VPCID != nil {
+		m["vpc_id"] = *instance.VPCID
+	}
+	if instance.AvailabilityZone != nil {
+		m["availability_zone"] = *instance.AvailabilityZone
+	}
+	if instance.KeyName != nil {
+		m["key_name"] = *instance.KeyName
+	}
 
 	// Handle security groups - extract just the group IDs
 	if len(instance.SecurityGroups) > 0 {
@@ -344,6 +404,26 @@ func (d *DriftDetector) terraformConfigToMap(config *terraform.TerraformConfig) 
 		"tags":          config.Tags,
 	}
 
+	// Add string fields if they have values
+	if config.PublicIP != "" {
+		m["public_ip"] = config.PublicIP
+	}
+	if config.PrivateIP != "" {
+		m["private_ip"] = config.PrivateIP
+	}
+	if config.SubnetID != "" {
+		m["subnet_id"] = config.SubnetID
+	}
+	if config.VPCID != "" {
+		m["vpc_id"] = config.VPCID
+	}
+	if config.AvailabilityZone != "" {
+		m["availability_zone"] = config.AvailabilityZone
+	}
+	if config.KeyName != "" {
+		m["key_name"] = config.KeyName
+	}
+
 	// Handle security groups - prefer SecurityGroupRefs over SecurityGroups
 	if len(config.SecurityGroupRefs) > 0 {
 		m["security_groups"] = config.SecurityGroupRefs
@@ -357,13 +437,6 @@ func (d *DriftDetector) terraformConfigToMap(config *terraform.TerraformConfig) 
 	}
 	if config.EBSOptimized != nil {
 		m["ebs_optimized"] = *config.EBSOptimized
-	}
-
-	// Remove nil values
-	for k, v := range m {
-		if v == nil || (reflect.ValueOf(v).Kind() == reflect.Ptr && reflect.ValueOf(v).IsNil()) {
-			delete(m, k)
-		}
 	}
 
 	return m

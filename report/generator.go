@@ -1,7 +1,7 @@
 package report
 
 import (
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 // ReportFormat represents the different output formats supported
@@ -53,7 +53,7 @@ type ReportConfig struct {
 	// ColorOutput enables color coding for console output
 	ColorOutput bool
 	// FilterSeverity filters results by minimum severity level
-	FilterSeverity drift.DriftSeverity
+	FilterSeverity interfaces.SeverityLevel
 
 	// ShowProgressIndicator shows progress for long operations
 	ShowProgressIndicator bool
@@ -62,19 +62,19 @@ type ReportConfig struct {
 // ReportGenerator defines the interface for generating drift reports
 type ReportGenerator interface {
 	// GenerateReport generates a report from drift results
-	GenerateReport(results map[string]*drift.DriftResult, config ReportConfig) ([]byte, error)
+	GenerateReport(results map[string]*interfaces.DriftResult, config ReportConfig) ([]byte, error)
 
 	// GenerateJSONReport generates a JSON format report
-	GenerateJSONReport(results map[string]*drift.DriftResult) ([]byte, error)
+	GenerateJSONReport(results map[string]*interfaces.DriftResult) ([]byte, error)
 
 	// GenerateYAMLReport generates a YAML format report
-	GenerateYAMLReport(results map[string]*drift.DriftResult) ([]byte, error)
+	GenerateYAMLReport(results map[string]*interfaces.DriftResult) ([]byte, error)
 
 	// GenerateTableReport generates a table format report
-	GenerateTableReport(results map[string]*drift.DriftResult) (string, error)
+	GenerateTableReport(results map[string]*interfaces.DriftResult) (string, error)
 
 	// GenerateConsoleReport generates a console report with color coding
-	GenerateConsoleReport(results map[string]*drift.DriftResult) (string, error)
+	GenerateConsoleReport(results map[string]*interfaces.DriftResult) (string, error)
 
 	// WriteToFile writes the report to a file
 	WriteToFile(content []byte, filePath string) error
@@ -105,7 +105,7 @@ type ReportData struct {
 	// Summary contains summary statistics
 	Summary ReportSummary `json:"summary"`
 	// Results contains the detailed drift results
-	Results map[string]*drift.DriftResult `json:"results"`
+	Results map[string]*interfaces.DriftResult `json:"results"`
 
 	// Metadata contains additional report metadata
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
@@ -120,7 +120,7 @@ func NewReportConfig() *ReportConfig {
 		IncludeTimestamp:       true,
 		IncludeSummary:         true,
 		ColorOutput:            true,
-		FilterSeverity:         drift.SeverityNone,
+		FilterSeverity:         interfaces.SeverityNone,
 
 		ShowProgressIndicator:  false,
 	}
@@ -145,7 +145,7 @@ func (rc *ReportConfig) WithOutputFile(filePath string) *ReportConfig {
 }
 
 // WithFilterSeverity sets the minimum severity level to include
-func (rc *ReportConfig) WithFilterSeverity(severity drift.DriftSeverity) *ReportConfig {
+func (rc *ReportConfig) WithFilterSeverity(severity interfaces.SeverityLevel) *ReportConfig {
 	rc.FilterSeverity = severity
 	return rc
 }

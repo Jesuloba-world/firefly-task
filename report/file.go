@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 // FileWriter handles writing reports to files with various formats
@@ -23,7 +23,7 @@ func NewFileWriter(config *ReportConfig) *FileWriter {
 }
 
 // WriteReport writes a report to file with the specified format
-func (fw *FileWriter) WriteReport(results map[string]*drift.DriftResult, filePath string, format ReportFormat) error {
+func (fw *FileWriter) WriteReport(results map[string]*interfaces.DriftResult, filePath string, format ReportFormat) error {
 	if results == nil {
 		return NewReportError(ErrorTypeInvalidInput, "results cannot be nil")
 	}
@@ -90,7 +90,7 @@ func (fw *FileWriter) WriteReport(results map[string]*drift.DriftResult, filePat
 }
 
 // WriteMultipleFormats writes the same report in multiple formats
-func (fw *FileWriter) WriteMultipleFormats(results map[string]*drift.DriftResult, baseFilePath string, formats []ReportFormat) error {
+func (fw *FileWriter) WriteMultipleFormats(results map[string]*interfaces.DriftResult, baseFilePath string, formats []ReportFormat) error {
 	if len(formats) == 0 {
 		return NewReportError(ErrorTypeInvalidInput, "no formats specified")
 	}
@@ -164,7 +164,7 @@ func NewArchiveWriter(config *ReportConfig, archiveDir string) *ArchiveWriter {
 }
 
 // WriteArchivedReport writes a report with timestamp-based archiving
-func (aw *ArchiveWriter) WriteArchivedReport(results map[string]*drift.DriftResult, baseName string, format ReportFormat) (string, error) {
+func (aw *ArchiveWriter) WriteArchivedReport(results map[string]*interfaces.DriftResult, baseName string, format ReportFormat) (string, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	fileName := fmt.Sprintf("%s-%s", baseName, timestamp)
 	filePath := filepath.Join(aw.archiveDir, aw.fileWriter.getFilePathForFormat(fileName, format))
@@ -246,7 +246,7 @@ func (ru *ReportUploader) UploadToGCS(filePath, bucket, object string) error {
 }
 
 // SendToWebhook sends report data to a webhook endpoint (placeholder implementation)
-func (ru *ReportUploader) SendToWebhook(results map[string]*drift.DriftResult, webhookURL string) error {
+func (ru *ReportUploader) SendToWebhook(results map[string]*interfaces.DriftResult, webhookURL string) error {
 	// This would make HTTP POST request to webhook
 	return NewReportError(ErrorTypeNotImplemented, "webhook integration not implemented yet")
 }

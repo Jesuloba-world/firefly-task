@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 func TestStandardReportGenerator_GenerateJSON(t *testing.T) {
@@ -161,7 +161,7 @@ func TestStandardReportGenerator_FilterBySeverity(t *testing.T) {
 
 	// Test filtering by high severity
 	config := NewReportConfig()
-	config.FilterSeverity = drift.SeverityHigh
+	config.FilterSeverity = interfaces.SeverityHigh
 	data, err := generator.GenerateReport(results, *config)
 	require.NoError(t, err)
 
@@ -198,7 +198,7 @@ func TestStandardReportGenerator_GenerateSummary(t *testing.T) {
 // Test with empty results
 func TestStandardReportGenerator_EmptyResults(t *testing.T) {
 	generator := NewStandardReportGenerator()
-	emptyResults := make(map[string]*drift.DriftResult)
+	emptyResults := make(map[string]*interfaces.DriftResult)
 
 	// Test JSON generation with empty results
 	data, err := generator.GenerateJSONReport(emptyResults)
@@ -282,18 +282,29 @@ func TestStandardReportGenerator_LargeDataset(t *testing.T) {
 	generator := NewStandardReportGenerator()
 
 	// Create a large dataset
-	largeResults := make(map[string]*drift.DriftResult)
+	largeResults := make(map[string]*interfaces.DriftResult)
 	for i := 0; i < 1000; i++ {
 		resourceID := fmt.Sprintf("aws_instance.test-%d", i)
-		result := drift.NewDriftResult(resourceID, "i-"+resourceID)
+		result := &interfaces.DriftResult{
+			ResourceID:    resourceID,
+			ResourceType:  "aws_instance",
+			IsDrifted:     i%3 == 0,
+			DetectionTime: time.Now(),
+			Severity:      interfaces.SeverityNone,
+			DriftDetails:  []*interfaces.DriftDetail{},
+		}
 
 		if i%3 == 0 { // Add drift to every third resource
-			result.AddDifference(drift.AttributeDifference{
-				AttributeName: "instance_type",
-				ExpectedValue: "t3.micro",
-				ActualValue:   "t3.small",
-				Severity:      drift.SeverityMedium,
-			})
+			result.Severity = interfaces.SeverityMedium
+			result.DriftDetails = []*interfaces.DriftDetail{
+				{
+					Attribute:     "instance_type",
+					ExpectedValue: "t3.micro",
+					ActualValue:   "t3.small",
+					DriftType:     "changed",
+					Severity:      interfaces.SeverityMedium,
+				},
+			}
 		}
 
 		largeResults[resourceID] = result

@@ -179,11 +179,11 @@ func TestParseStateIntegration(t *testing.T) {
 	if !exists {
 		t.Error("Expected aws_instance.web configuration not found")
 	} else {
-		if webConfig.InstanceType != "t3.micro" {
-			t.Errorf("Expected instance type t3.micro, got %s", webConfig.InstanceType)
+		if webConfig.Attributes["instance_type"] != "t3.micro" {
+			t.Errorf("Expected instance type t3.micro, got %s", webConfig.Attributes["instance_type"])
 		}
-		if webConfig.AMI != "ami-12345678" {
-			t.Errorf("Expected AMI ami-12345678, got %s", webConfig.AMI)
+		if webConfig.Attributes["ami"] != "ami-12345678" {
+			t.Errorf("Expected AMI ami-12345678, got %s", webConfig.Attributes["ami"])
 		}
 		if webConfig.TerraformVersion != "1.0.0" {
 			t.Errorf("Expected Terraform version 1.0.0, got %s", webConfig.TerraformVersion)
@@ -195,11 +195,11 @@ func TestParseStateIntegration(t *testing.T) {
 	if !exists {
 		t.Error("Expected aws_instance.db configuration not found")
 	} else {
-		if dbConfig.InstanceType != "t3.small" {
-			t.Errorf("Expected instance type t3.small, got %s", dbConfig.InstanceType)
+		if dbConfig.Attributes["instance_type"] != "t3.small" {
+			t.Errorf("Expected instance type t3.small, got %s", dbConfig.Attributes["instance_type"])
 		}
-		if dbConfig.AMI != "ami-87654321" {
-			t.Errorf("Expected AMI ami-87654321, got %s", dbConfig.AMI)
+		if dbConfig.Attributes["ami"] != "ami-87654321" {
+			t.Errorf("Expected AMI ami-87654321, got %s", dbConfig.Attributes["ami"])
 		}
 	}
 }

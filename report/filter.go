@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 // FilterCriteria defines criteria for filtering drift results
 type FilterCriteria struct {
 	// Severity filtering
-	MinSeverity    drift.DriftSeverity
-	MaxSeverity    drift.DriftSeverity
-	SeverityLevels []drift.DriftSeverity
+	MinSeverity    interfaces.SeverityLevel
+	MaxSeverity    interfaces.SeverityLevel
+	SeverityLevels []interfaces.SeverityLevel
 
 	// Resource filtering
 	ResourceIDs     []string
@@ -111,15 +111,15 @@ func (ds DriftStatus) String() string {
 // NewFilterCriteria creates a new FilterCriteria with default values
 func NewFilterCriteria() *FilterCriteria {
 	return &FilterCriteria{
-		MinSeverity: drift.SeverityLow,
-		MaxSeverity: drift.SeverityCritical,
+		MinSeverity: interfaces.SeverityLow,
+		MaxSeverity: interfaces.SeverityCritical,
 		SortBy:      SortByResourceID,
 		SortOrder:   SortOrderAsc,
 	}
 }
 
 // WithMinSeverity sets the minimum severity level
-func (fc *FilterCriteria) WithMinSeverity(severity drift.DriftSeverity) *FilterCriteria {
+func (fc *FilterCriteria) WithMinSeverity(severity interfaces.SeverityLevel) *FilterCriteria {
 	fc.MinSeverity = severity
 	return fc
 }
@@ -208,8 +208,8 @@ type ResultFilter struct {
 func NewResultFilter() *ResultFilter {
 	return &ResultFilter{
 		criteria: &FilterCriteria{
-			MinSeverity: drift.SeverityNone,
-			MaxSeverity: drift.SeverityCritical,
+			MinSeverity: interfaces.SeverityNone,
+			MaxSeverity: interfaces.SeverityCritical,
 			SortBy:      SortByResourceID,
 			SortOrder:   SortOrderAsc,
 		},
@@ -217,14 +217,14 @@ func NewResultFilter() *ResultFilter {
 }
 
 // WithSeverity sets severity filtering
-func (rf *ResultFilter) WithSeverity(min, max drift.DriftSeverity) *ResultFilter {
+func (rf *ResultFilter) WithSeverity(min, max interfaces.SeverityLevel) *ResultFilter {
 	rf.criteria.MinSeverity = min
 	rf.criteria.MaxSeverity = max
 	return rf
 }
 
 // WithSeverityLevels sets specific severity levels to include
-func (rf *ResultFilter) WithSeverityLevels(levels ...drift.DriftSeverity) *ResultFilter {
+func (rf *ResultFilter) WithSeverityLevels(levels ...interfaces.SeverityLevel) *ResultFilter {
 	rf.criteria.SeverityLevels = levels
 	return rf
 }
@@ -311,15 +311,15 @@ func (rf *ResultFilter) WithSort(sortBy FilterSortBy, order FilterSortOrder) *Re
 }
 
 // Apply applies the filter to drift results
-func (rf *ResultFilter) Apply(results map[string]*drift.DriftResult) []*drift.DriftResult {
+func (rf *ResultFilter) Apply(results map[string]*interfaces.DriftResult) []*interfaces.DriftResult {
 	if results == nil {
 		return nil
 	}
 
 	// Convert to slice for easier processing
-	var resultList []*drift.DriftResult
-	for _, result := range results {
-		if rf.matchesResourceCriteria(result) {
+	var resultList []*interfaces.DriftResult
+	for resourceKey, result := range results {
+		if rf.matchesResourceCriteria(resourceKey, result) {
 			filteredResult := rf.filterDifferences(result)
 			if filteredResult != nil {
 				resultList = append(resultList, filteredResult)
@@ -339,17 +339,17 @@ func (rf *ResultFilter) Apply(results map[string]*drift.DriftResult) []*drift.Dr
 }
 
 // matchesResourceCriteria checks if a result matches resource-level criteria
-func (rf *ResultFilter) matchesResourceCriteria(result *drift.DriftResult) bool {
+func (rf *ResultFilter) matchesResourceCriteria(resourceKey string, result *interfaces.DriftResult) bool {
 	// Check drift status
-	if rf.criteria.OnlyWithDrift && !result.HasDrift {
+	if rf.criteria.OnlyWithDrift && !result.IsDrifted {
 		return false
 	}
-	if rf.criteria.OnlyWithoutDrift && result.HasDrift {
+	if rf.criteria.OnlyWithoutDrift && result.IsDrifted {
 		return false
 	}
 
 	// Check severity
-	if !rf.matchesSeverity(result.OverallSeverity) {
+	if !rf.matchesSeverity(result.Severity) {
 		return false
 	}
 
@@ -369,16 +369,19 @@ func (rf *ResultFilter) matchesResourceCriteria(result *drift.DriftResult) bool 
 
 	// Check resource pattern
 	if rf.criteria.ResourcePattern != nil {
-		if !rf.criteria.ResourcePattern.MatchString(result.ResourceID) {
+		matches := rf.criteria.ResourcePattern.MatchString(resourceKey)
+		// Debug output for testing
+		if !matches {
+			// This will be visible in test output
 			return false
 		}
 	}
 
-	// Check instance IDs
+	// Check instance IDs (using ResourceID since InstanceID doesn't exist)
 	if len(rf.criteria.InstanceIDs) > 0 {
 		found := false
 		for _, id := range rf.criteria.InstanceIDs {
-			if result.InstanceID == id {
+			if result.ResourceID == id {
 				found = true
 				break
 			}
@@ -389,10 +392,10 @@ func (rf *ResultFilter) matchesResourceCriteria(result *drift.DriftResult) bool 
 	}
 
 	// Check time range
-	if rf.criteria.After != nil && result.Timestamp.Before(*rf.criteria.After) {
+	if rf.criteria.After != nil && result.DetectionTime.Before(*rf.criteria.After) {
 		return false
 	}
-	if rf.criteria.Before != nil && result.Timestamp.After(*rf.criteria.Before) {
+	if rf.criteria.Before != nil && result.DetectionTime.After(*rf.criteria.Before) {
 		return false
 	}
 
@@ -400,7 +403,7 @@ func (rf *ResultFilter) matchesResourceCriteria(result *drift.DriftResult) bool 
 }
 
 // matchesSeverity checks if severity matches criteria
-func (rf *ResultFilter) matchesSeverity(severity drift.DriftSeverity) bool {
+func (rf *ResultFilter) matchesSeverity(severity interfaces.SeverityLevel) bool {
 	// Check specific severity levels
 	if len(rf.criteria.SeverityLevels) > 0 {
 		found := false
@@ -413,71 +416,74 @@ func (rf *ResultFilter) matchesSeverity(severity drift.DriftSeverity) bool {
 		return found
 	}
 
-	// Check severity range
-	return severity >= rf.criteria.MinSeverity && severity <= rf.criteria.MaxSeverity
+	// Check severity range using numeric comparison
+	severityOrder := getSeverityOrder(severity)
+	minOrder := getSeverityOrder(rf.criteria.MinSeverity)
+	maxOrder := getSeverityOrder(rf.criteria.MaxSeverity)
+	return severityOrder >= minOrder && severityOrder <= maxOrder
 }
 
 // filterDifferences filters differences within a result
-func (rf *ResultFilter) filterDifferences(result *drift.DriftResult) *drift.DriftResult {
+func (rf *ResultFilter) filterDifferences(result *interfaces.DriftResult) *interfaces.DriftResult {
 	if result == nil {
 		return nil
 	}
 
 	// Create a copy of the result
-	filteredResult := &drift.DriftResult{
+	filteredResult := &interfaces.DriftResult{
 		ResourceID:      result.ResourceID,
-		InstanceID:      result.InstanceID,
-		Timestamp:       result.Timestamp,
-		OverallSeverity: result.OverallSeverity,
-		HasDrift:        result.HasDrift,
-		Differences:     []drift.AttributeDifference{},
+		ResourceType:    result.ResourceType,
+		DetectionTime:   result.DetectionTime,
+		Severity:        result.Severity,
+		IsDrifted:       result.IsDrifted,
+		DriftDetails:    []*interfaces.DriftDetail{},
 	}
 
 	// Filter differences
-	for _, diff := range result.Differences {
-		if rf.matchesDifferenceCriteria(diff) {
-			filteredResult.Differences = append(filteredResult.Differences, diff)
+	for _, diff := range result.DriftDetails {
+		if rf.matchesDifferenceCriteria(*diff) {
+			filteredResult.DriftDetails = append(filteredResult.DriftDetails, diff)
 		}
 	}
 
 	// Check if attribute-related filters are applied and no differences match
-	hasAttributeFilters := rf.criteria.AttributePattern != nil || 
-		len(rf.criteria.AttributeNames) > 0 || 
+	hasAttributeFilters := rf.criteria.AttributePattern != nil ||
+		len(rf.criteria.AttributeNames) > 0 ||
 		len(rf.criteria.ExcludeAttributes) > 0 ||
 		rf.criteria.ExpectedValuePattern != nil ||
 		rf.criteria.ActualValuePattern != nil
-	
-	if hasAttributeFilters && len(filteredResult.Differences) == 0 {
+
+	if hasAttributeFilters && len(filteredResult.DriftDetails) == 0 {
 		return nil
 	}
 
 	// Update drift status based on filtered differences
-	filteredResult.HasDrift = len(filteredResult.Differences) > 0
-	if filteredResult.HasDrift {
+	filteredResult.IsDrifted = len(filteredResult.DriftDetails) > 0
+	if filteredResult.IsDrifted {
 		// Recalculate overall severity
-		filteredResult.OverallSeverity = rf.calculateOverallSeverity(filteredResult.Differences)
+		filteredResult.Severity = rf.calculateOverallSeverity(filteredResult.DriftDetails)
 	} else {
-		filteredResult.OverallSeverity = drift.SeverityNone
+		filteredResult.Severity = interfaces.SeverityNone
 	}
 
 	// Check if filtered result still matches criteria
-	if rf.criteria.OnlyWithDrift && !filteredResult.HasDrift {
+	if rf.criteria.OnlyWithDrift && !filteredResult.IsDrifted {
 		return nil
 	}
-	if rf.criteria.OnlyWithoutDrift && filteredResult.HasDrift {
+	if rf.criteria.OnlyWithoutDrift && filteredResult.IsDrifted {
 		return nil
 	}
 
 	return filteredResult
 }
 
-// matchesDifferenceCriteria checks if a difference matches criteria
-func (rf *ResultFilter) matchesDifferenceCriteria(diff drift.AttributeDifference) bool {
+// matchesDifferenceCriteria checks if a difference matches the filter criteria
+func (rf *ResultFilter) matchesDifferenceCriteria(diff interfaces.DriftDetail) bool {
 	// Check attribute names
 	if len(rf.criteria.AttributeNames) > 0 {
 		found := false
 		for _, name := range rf.criteria.AttributeNames {
-			if diff.AttributeName == name {
+			if diff.Attribute == name {
 				found = true
 				break
 			}
@@ -489,14 +495,14 @@ func (rf *ResultFilter) matchesDifferenceCriteria(diff drift.AttributeDifference
 
 	// Check excluded attributes
 	for _, excluded := range rf.criteria.ExcludeAttributes {
-		if diff.AttributeName == excluded {
+		if diff.Attribute == excluded {
 			return false
 		}
 	}
 
 	// Check attribute pattern
 	if rf.criteria.AttributePattern != nil {
-		if !rf.criteria.AttributePattern.MatchString(diff.AttributeName) {
+		if !rf.criteria.AttributePattern.MatchString(diff.Attribute) {
 			return false
 		}
 	}
@@ -522,15 +528,18 @@ func (rf *ResultFilter) matchesDifferenceCriteria(diff drift.AttributeDifference
 }
 
 // calculateOverallSeverity calculates overall severity from differences
-func (rf *ResultFilter) calculateOverallSeverity(differences []drift.AttributeDifference) drift.DriftSeverity {
+func (rf *ResultFilter) calculateOverallSeverity(differences []*interfaces.DriftDetail) interfaces.SeverityLevel {
 	if len(differences) == 0 {
-		return drift.SeverityNone
+		return interfaces.SeverityNone
 	}
 
-	maxSeverity := drift.SeverityNone
+	maxSeverity := interfaces.SeverityNone
+	maxOrder := getSeverityOrder(maxSeverity)
 	for _, diff := range differences {
-		if diff.Severity > maxSeverity {
+		diffOrder := getSeverityOrder(diff.Severity)
+		if diffOrder > maxOrder {
 			maxSeverity = diff.Severity
+			maxOrder = diffOrder
 		}
 	}
 
@@ -538,18 +547,18 @@ func (rf *ResultFilter) calculateOverallSeverity(differences []drift.AttributeDi
 }
 
 // sortResults sorts results based on criteria
-func (rf *ResultFilter) sortResults(results []*drift.DriftResult) {
+func (rf *ResultFilter) sortResults(results []*interfaces.DriftResult) {
 	sort.Slice(results, func(i, j int) bool {
 		var less bool
 		switch rf.criteria.SortBy {
 		case SortByResourceID:
 			less = results[i].ResourceID < results[j].ResourceID
 		case SortBySeverity:
-			less = results[i].OverallSeverity < results[j].OverallSeverity
+			less = results[i].Severity < results[j].Severity
 		case SortByTimestamp:
-			less = results[i].Timestamp.Before(results[j].Timestamp)
+			less = results[i].DetectionTime.Before(results[j].DetectionTime)
 		case SortByDifferenceCount:
-			less = len(results[i].Differences) < len(results[j].Differences)
+			less = len(results[i].DriftDetails) < len(results[j].DriftDetails)
 		case SortByResourceType:
 			// Extract resource type from resource ID (assuming format like "aws_instance.example")
 			typeI := rf.extractResourceType(results[i].ResourceID)
@@ -575,11 +584,13 @@ func (rf *ResultFilter) extractResourceType(resourceID string) string {
 	return resourceID
 }
 
+
+
 // paginateResults applies pagination to results
-func (rf *ResultFilter) paginateResults(results []*drift.DriftResult) []*drift.DriftResult {
+func (rf *ResultFilter) paginateResults(results []*interfaces.DriftResult) []*interfaces.DriftResult {
 	start := rf.criteria.Offset
 	if start >= len(results) {
-		return []*drift.DriftResult{}
+		return []*interfaces.DriftResult{}
 	}
 
 	end := len(results)
@@ -597,7 +608,7 @@ func (rf *ResultFilter) paginateResults(results []*drift.DriftResult) []*drift.D
 func (rf *ResultFilter) GetFilterSummary() map[string]interface{} {
 	summary := make(map[string]interface{})
 
-	if rf.criteria.MinSeverity != drift.SeverityNone || rf.criteria.MaxSeverity != drift.SeverityCritical {
+	if rf.criteria.MinSeverity != interfaces.SeverityNone || rf.criteria.MaxSeverity != interfaces.SeverityCritical {
 		summary["severity_range"] = map[string]string{
 			"min": rf.criteria.MinSeverity.String(),
 			"max": rf.criteria.MaxSeverity.String(),
@@ -655,12 +666,12 @@ func NewPresetFilters() *PresetFilters {
 
 // CriticalOnly returns filter for critical severity only
 func (pf *PresetFilters) CriticalOnly() *ResultFilter {
-	return NewResultFilter().WithSeverityLevels(drift.SeverityCritical)
+	return NewResultFilter().WithSeverityLevels(interfaces.SeverityCritical)
 }
 
 // HighAndCritical returns filter for high and critical severity
 func (pf *PresetFilters) HighAndCritical() *ResultFilter {
-	return NewResultFilter().WithSeverityLevels(drift.SeverityCritical, drift.SeverityHigh)
+	return NewResultFilter().WithSeverityLevels(interfaces.SeverityCritical, interfaces.SeverityHigh)
 }
 
 // SecurityRelated returns filter for security-related attributes

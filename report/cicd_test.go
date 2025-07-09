@@ -12,35 +12,71 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
+// convertToValueMap converts pointer map to value map
+func convertToValueMap(ptrMap map[string]*interfaces.DriftResult) map[string]interfaces.DriftResult {
+	valueMap := make(map[string]interfaces.DriftResult)
+	for k, v := range ptrMap {
+		if v != nil {
+			valueMap[k] = *v
+		}
+	}
+	return valueMap
+}
+
 // createTestReportData creates test drift results for CICD tests
-func createTestReportData() map[string]*drift.DriftResult {
-	results := make(map[string]*drift.DriftResult)
+func createTestReportData() map[string]*interfaces.DriftResult {
+	results := make(map[string]*interfaces.DriftResult)
 
 	// Resource with drift
-	result1 := drift.NewDriftResult("aws_instance.test", "i-test123")
-	result1.AddDifference(drift.AttributeDifference{
-		AttributeName: "instance_type",
-		ExpectedValue: "t2.micro",
-		ActualValue:   "t2.small",
-		Severity:      drift.SeverityHigh,
-	})
+	result1 := &interfaces.DriftResult{
+		ResourceID:    "aws_instance.test",
+		ResourceType:  "aws_instance",
+		IsDrifted:     true,
+		DetectionTime: time.Now(),
+		Severity:      interfaces.SeverityHigh,
+		DriftDetails: []*interfaces.DriftDetail{
+			{
+				Attribute:     "instance_type",
+				ExpectedValue: "t2.micro",
+				ActualValue:   "t2.small",
+				DriftType:     "changed",
+				Severity:      interfaces.SeverityHigh,
+			},
+		},
+	}
 	results["aws_instance.test"] = result1
 
 	// Resource with critical drift
-	result2 := drift.NewDriftResult("aws_s3_bucket.data", "bucket-data-123")
-	result2.AddDifference(drift.AttributeDifference{
-		AttributeName: "public_access_block",
-		ExpectedValue: "true",
-		ActualValue:   "false",
-		Severity:      drift.SeverityCritical,
-	})
+	result2 := &interfaces.DriftResult{
+		ResourceID:    "aws_s3_bucket.data",
+		ResourceType:  "aws_s3_bucket",
+		IsDrifted:     true,
+		DetectionTime: time.Now(),
+		Severity:      interfaces.SeverityCritical,
+		DriftDetails: []*interfaces.DriftDetail{
+			{
+				Attribute:     "public_access_block",
+				ExpectedValue: "true",
+				ActualValue:   "false",
+				DriftType:     "changed",
+				Severity:      interfaces.SeverityCritical,
+			},
+		},
+	}
 	results["aws_s3_bucket.data"] = result2
 
 	// Clean resource
-	result3 := drift.NewDriftResult("aws_instance.clean", "i-clean456")
+	result3 := &interfaces.DriftResult{
+		ResourceID:    "aws_instance.clean",
+		ResourceType:  "aws_instance",
+		IsDrifted:     false,
+		DetectionTime: time.Now(),
+		Severity:      interfaces.SeverityNone,
+		DriftDetails:  []*interfaces.DriftDetail{},
+	}
 	results["aws_instance.clean"] = result3
 
 	return results
@@ -173,7 +209,7 @@ func TestCIReportGenerator_GenerateCIReport(t *testing.T) {
 	generator := NewCIReportGenerator()
 	data := createTestReportData()
 
-	report, err := generator.GenerateCIReport(data)
+	report, err := generator.GenerateCIReport(convertToValueMap(data))
 	require.NoError(t, err)
 	require.NotNil(t, report)
 
@@ -294,24 +330,37 @@ func TestCIReportGenerator_SetExitCode(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		severity drift.DriftSeverity
+		severity interfaces.SeverityLevel
 		expected int
 	}{
-		{"No drift", drift.DriftSeverity(0), 0},
-		{"Low severity", drift.SeverityLow, 0},
-		{"Medium severity", drift.SeverityMedium, 0},
-		{"High severity", drift.SeverityHigh, 1},
-		{"Critical severity", drift.SeverityCritical, 2},
+		{"No drift", interfaces.SeverityNone, 0},
+		{"Low severity", interfaces.SeverityLow, 0},
+		{"Medium severity", interfaces.SeverityMedium, 0},
+		{"High severity", interfaces.SeverityHigh, 1},
+		{"Critical severity", interfaces.SeverityCritical, 2},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test data with the specified severity
-			results := make(map[string]*drift.DriftResult)
-			if tt.severity > 0 {
-				results["test-resource"] = &drift.DriftResult{
-					HasDrift:        true,
-					OverallSeverity: tt.severity,
+			results := make(map[string]*interfaces.DriftResult)
+			if tt.severity != interfaces.SeverityNone {
+				severity := tt.severity
+				results["test-resource"] = &interfaces.DriftResult{
+					ResourceID:    "test-resource",
+					ResourceType:  "test_resource",
+					IsDrifted:     true,
+					DetectionTime: time.Now(),
+					Severity:      severity,
+					DriftDetails: []*interfaces.DriftDetail{
+						{
+							Attribute:     "test_attribute",
+							ExpectedValue: "expected",
+							ActualValue:   "actual",
+							DriftType:     "changed",
+							Severity:      severity,
+						},
+					},
 				}
 			}
 			result := generator.SetExitCode(results)
@@ -452,10 +501,10 @@ func TestCIReportGenerator_EmptyData(t *testing.T) {
 	generator := NewCIReportGenerator()
 	generator.OutputDir = tempDir
 
-	emptyData := make(map[string]*drift.DriftResult)
+	emptyData := make(map[string]*interfaces.DriftResult)
 
 	// Test generating CI report with empty data
-	report, err := generator.GenerateCIReport(emptyData)
+	report, err := generator.GenerateCIReport(convertToValueMap(emptyData))
 	require.NoError(t, err)
 	assert.NotNil(t, report)
 	assert.Equal(t, 0, report.Summary.TotalResources)
@@ -574,7 +623,7 @@ func BenchmarkCIReportGenerator_GenerateCIReport(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := generator.GenerateCIReport(data)
+		_, err := generator.GenerateCIReport(convertToValueMap(data))
 		if err != nil {
 			b.Fatal(err)
 		}

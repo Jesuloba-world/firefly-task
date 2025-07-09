@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"firefly-task/drift"
+	"firefly-task/pkg/interfaces"
 )
 
 /*func TestFileWriter_WriteReport(t *testing.T) {
@@ -326,7 +326,7 @@ func TestFileWriter_EdgeCases(t *testing.T) {
 	writer := NewFileWriter(config)
 
 	// Test with empty data
-	emptyData := make(map[string]*drift.DriftResult)
+	emptyData := make(map[string]*interfaces.DriftResult)
 	filePath := filepath.Join(tempDir, "empty-report.json")
 
 	err := writer.WriteReport(emptyData, filePath, FormatJSON)
