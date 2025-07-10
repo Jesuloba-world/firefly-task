@@ -1,0 +1,234 @@
+# Firefly Configuration Example
+# Copy this file to firefly.yaml and customize for your environment
+
+# AWS Configuration
+aws:
+  # AWS region to operate in
+  region: "us-west-2"
+  
+  # AWS profile to use (optional, defaults to default profile)
+  profile: "default"
+  
+  # API timeout for AWS operations
+  timeout: "30s"
+  
+  # Maximum number of retries for failed AWS API calls
+  max_retries: 3
+  
+  # Rate limiting for AWS API calls (requests per second)
+  rate_limit: "10/s"
+
+# Logging Configuration
+logging:
+  # Log level: debug, info, warn, error
+  level: "info"
+  
+  # Log format: json, text, structured
+  format: "json"
+  
+  # Output destination: stdout, stderr, or file path
+  output: "stdout"
+  
+  # Include timestamps in log output
+  timestamp: true
+  
+  # Include caller information (file:line) in logs
+  caller: false
+  
+  # Enable colored output (only for text format)
+  color: true
+
+# Reporting Configuration
+reporting:
+  # Default report format: json, yaml, html, markdown, csv, xml
+  format: "json"
+  
+  # Output directory for reports
+  output_dir: "./reports"
+  
+  # Include metadata in reports (timestamps, version, etc.)
+  include_metadata: true
+  
+  # Custom template path for report generation
+  template_path: ""
+  
+  # Compress large reports
+  compress: false
+  
+  # Maximum report size before compression (in MB)
+  max_size_mb: 50
+
+# Drift Detection Configuration
+drift:
+  # Tags to ignore during drift comparison
+  ignore_tags:
+    - "LastModified"
+    - "CreatedBy"
+    - "aws:cloudformation:stack-name"
+    - "aws:cloudformation:logical-id"
+  
+  # Attributes to ignore during comparison
+  ignore_attributes:
+    - "launch_time"
+    - "state_transition_reason"
+    - "state_reason"
+  
+  # Enable strict comparison mode (fail on any difference)
+  strict_mode: false
+  
+  # Timeout for drift detection operations
+  timeout: "5m"
+  
+  # Custom severity rules for different types of drift
+  severity_rules:
+    security_group_changes: "high"
+    instance_type_changes: "medium"
+    tag_changes: "low"
+    subnet_changes: "critical"
+  
+  # Ignore drift for instances in these states
+  ignore_states:
+    - "terminated"
+    - "terminating"
+    - "shutting-down"
+
+# Parallel Processing Configuration
+parallel:
+  # Maximum number of concurrent workers
+  max_workers: 10
+  
+  # Batch size for processing multiple instances
+  batch_size: 50
+  
+  # Rate limiting for parallel operations
+  rate_limit: "100/s"
+  
+  # Timeout for individual worker operations
+  worker_timeout: "2m"
+
+# Caching Configuration
+cache:
+  # Enable caching for AWS API responses
+  enabled: true
+  
+  # Cache time-to-live
+  ttl: "15m"
+  
+  # Cache directory
+  directory: "./.firefly-cache"
+  
+  # Maximum cache size (in MB)
+  max_size_mb: 100
+  
+  # Cache cleanup interval
+  cleanup_interval: "1h"
+
+# Terraform Configuration
+terraform:
+  # Default Terraform configuration path
+  config_path: "./terraform"
+  
+  # Terraform binary path (optional)
+  binary_path: ""
+  
+  # Terraform workspace to use
+  workspace: "default"
+  
+  # Variables to pass to Terraform
+  variables: {}
+  
+  # Variable files to load
+  var_files: []
+  
+  # Timeout for Terraform operations
+  timeout: "10m"
+
+# Notification Configuration (optional)
+notifications:
+  # Slack webhook URL for notifications
+  slack:
+    webhook_url: ""
+    channel: "#infrastructure"
+    username: "Firefly"
+  
+  # Email configuration
+  email:
+    smtp_host: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+    from: "firefly@company.com"
+    to: ["team@company.com"]
+  
+  # Webhook for custom notifications
+  webhook:
+    url: ""
+    headers: {}
+    timeout: "10s"
+
+# Monitoring Configuration (optional)
+monitoring:
+  # Prometheus metrics endpoint
+  prometheus:
+    enabled: false
+    port: 9090
+    path: "/metrics"
+  
+  # Health check endpoint
+  health_check:
+    enabled: false
+    port: 8080
+    path: "/health"
+
+# Security Configuration
+security:
+  # Enable TLS for API endpoints
+  tls_enabled: false
+  
+  # TLS certificate file
+  tls_cert_file: ""
+  
+  # TLS private key file
+  tls_key_file: ""
+  
+  # API key for authentication (if required)
+  api_key: ""
+  
+  # Allowed IP addresses for API access
+  allowed_ips: []
+
+# Feature Flags
+features:
+  # Enable experimental features
+  experimental: false
+  
+  # Enable beta features
+  beta: false
+  
+  # Enable debug features
+  debug: false
+
+# Environment-specific overrides
+# These can be used to override settings based on environment
+environments:
+  development:
+    logging:
+      level: "debug"
+    drift:
+      strict_mode: false
+  
+  staging:
+    logging:
+      level: "info"
+    drift:
+      strict_mode: true
+  
+  production:
+    logging:
+      level: "warn"
+    drift:
+      strict_mode: true
+    parallel:
+      max_workers: 20
+    cache:
+      ttl: "30m"
