@@ -2,6 +2,7 @@ package terraform
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -103,6 +104,16 @@ func (p *TerraformParser) ClearErrors() {
 
 // ParseState parses a Terraform state file and returns extracted configurations
 func (p *TerraformParser) ParseState(statePath string) (map[string]*interfaces.TerraformConfig, error) {
+	return p.ParseTerraformState(statePath)
+}
+
+// ParseHCL parses Terraform HCL configuration files and returns extracted configurations
+func (p *TerraformParser) ParseHCL(configPath string) (map[string]*interfaces.TerraformConfig, error) {
+	return p.ParseTerraformHCL(configPath)
+}
+
+// ParseTerraformState parses a Terraform state file and returns extracted configurations
+func (p *TerraformParser) ParseTerraformState(statePath string) (map[string]*interfaces.TerraformConfig, error) {
 
 	// Validate file extension if strict mode is enabled
 	if p.options.StrictMode {
@@ -143,8 +154,8 @@ func (p *TerraformParser) ParseState(statePath string) (map[string]*interfaces.T
 	return configs, nil
 }
 
-// ParseHCL parses Terraform HCL configuration files and returns extracted configurations
-func (p *TerraformParser) ParseHCL(configPath string) (map[string]*interfaces.TerraformConfig, error) {
+// ParseTerraformHCL parses Terraform HCL configuration files and returns extracted configurations
+func (p *TerraformParser) ParseTerraformHCL(configPath string) (map[string]*interfaces.TerraformConfig, error) {
 	p.ClearErrors()
 
 	// Parse the HCL configuration
@@ -178,13 +189,13 @@ func (p *TerraformParser) ParseBoth(statePath, configPath string) (map[string]*i
 	p.ClearErrors()
 
 	// Parse state file
-	stateConfigs, err := p.ParseState(statePath)
+	stateConfigs, err := p.ParseTerraformState(statePath)
 	if err != nil && !p.options.IgnoreMissingFiles {
 		return nil, fmt.Errorf("failed to parse state: %w", err)
 	}
 
 	// Parse HCL configuration
-	hclConfigs, err := p.ParseHCL(configPath)
+	hclConfigs, err := p.ParseTerraformHCL(configPath)
 	if err != nil && !p.options.IgnoreMissingFiles {
 		return nil, fmt.Errorf("failed to parse HCL: %w", err)
 	}
@@ -284,4 +295,64 @@ func NewParseError(errorType, message, path string, cause error) *ParseError {
 		Path:    path,
 		Cause:   cause,
 	}
+}
+
+// ValidateStateFile validates that the state file is valid and readable
+func (p *TerraformParser) ValidateStateFile(filePath string) error {
+	if filePath == "" {
+		return fmt.Errorf("state file path cannot be empty")
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("state file does not exist: %s", filePath)
+	}
+
+	// Check file extension if strict mode is enabled
+	if p.options.StrictMode {
+		if !p.isSupportedFormat(filePath) {
+			return fmt.Errorf("unsupported state file format: %s", filepath.Ext(filePath))
+		}
+	}
+
+	// Try to parse the file to validate its structure
+	_, err := ParseTerraformState(filePath)
+	if err != nil {
+		return fmt.Errorf("invalid state file format: %w", err)
+	}
+
+	return nil
+}
+
+// ValidateHCLDirectory validates that the HCL directory contains valid Terraform files
+func (p *TerraformParser) ValidateHCLDirectory(dirPath string) error {
+	if dirPath == "" {
+		return fmt.Errorf("HCL directory path cannot be empty")
+	}
+
+	// Check if directory exists
+	info, err := os.Stat(dirPath)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("HCL directory does not exist: %s", dirPath)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("path is not a directory: %s", dirPath)
+	}
+
+	// Check for .tf files
+	files, err := filepath.Glob(filepath.Join(dirPath, "*.tf"))
+	if err != nil {
+		return fmt.Errorf("failed to search for .tf files: %w", err)
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("no .tf files found in directory: %s", dirPath)
+	}
+
+	// Try to parse the directory to validate its structure
+	_, err = ParseTerraformHCL(dirPath)
+	if err != nil {
+		return fmt.Errorf("invalid HCL configuration: %w", err)
+	}
+
+	return nil
 }

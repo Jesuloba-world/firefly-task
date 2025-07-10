@@ -100,8 +100,8 @@ func NewConcreteReportFactory(logger *logrus.Logger) *ConcreteReportFactory {
 
 // ReportGenerator implementation methods
 
-// GenerateJSONReport generates a JSON format report
-func (g *ConcreteReportGenerator) GenerateJSONReport(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
+// GenerateJSONReportWithContext generates a JSON format report with context
+func (g *ConcreteReportGenerator) GenerateJSONReportWithContext(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
 	g.logger.Debugf("ConcreteReportGenerator: Generating JSON report for %d drift results", len(driftResults))
 	
 	if driftResults == nil {
@@ -116,8 +116,8 @@ func (g *ConcreteReportGenerator) GenerateJSONReport(ctx context.Context, driftR
 	return jsonData, nil
 }
 
-// GenerateYAMLReport generates a YAML format report
-func (g *ConcreteReportGenerator) GenerateYAMLReport(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
+// GenerateYAMLReportWithContext generates a YAML format report with context
+func (g *ConcreteReportGenerator) GenerateYAMLReportWithContext(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
 	g.logger.Debugf("ConcreteReportGenerator: Generating YAML report for %d drift results", len(driftResults))
 	
 	if driftResults == nil {
@@ -132,22 +132,22 @@ func (g *ConcreteReportGenerator) GenerateYAMLReport(ctx context.Context, driftR
 	return yamlData, nil
 }
 
-// GenerateTableReport generates a table format report
-func (g *ConcreteReportGenerator) GenerateTableReport(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
+// GenerateTableReportWithContext generates a table format report with context
+func (g *ConcreteReportGenerator) GenerateTableReportWithContext(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
 	g.logger.Debugf("ConcreteReportGenerator: Generating table report for %d drift results", len(driftResults))
 	// Implement table generation logic here
 	return nil, fmt.Errorf("not implemented")
 }
 
-// GenerateHTMLReport generates an HTML format report
-func (g *ConcreteReportGenerator) GenerateHTMLReport(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
+// GenerateHTMLReportWithContext generates an HTML format report with context
+func (g *ConcreteReportGenerator) GenerateHTMLReportWithContext(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
 	g.logger.Debugf("ConcreteReportGenerator: Generating HTML report for %d drift results", len(driftResults))
 	// Implement HTML generation logic here
 	return nil, fmt.Errorf("not implemented")
 }
 
-// GenerateMarkdownReport generates a Markdown format report
-func (g *ConcreteReportGenerator) GenerateMarkdownReport(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
+// GenerateMarkdownReportWithContext generates a Markdown format report with context
+func (g *ConcreteReportGenerator) GenerateMarkdownReportWithContext(ctx context.Context, driftResults map[string]*interfaces.DriftResult, options map[string]interface{}) ([]byte, error) {
 	g.logger.Debugf("ConcreteReportGenerator: Generating Markdown report for %d drift results", len(driftResults))
 	// Implement Markdown generation logic here
 	return nil, fmt.Errorf("not implemented")
@@ -159,18 +159,72 @@ func (g *ConcreteReportGenerator) GenerateCustomReport(ctx context.Context, drif
 	
 	switch strings.ToLower(format) {
 	case "json":
-		return g.GenerateJSONReport(ctx, driftResults, options)
+		return g.GenerateJSONReportWithContext(ctx, driftResults, options)
 	case "yaml", "yml":
-		return g.GenerateYAMLReport(ctx, driftResults, options)
+		return g.GenerateYAMLReportWithContext(ctx, driftResults, options)
 	case "table":
-		return g.GenerateTableReport(ctx, driftResults, options)
+		return g.GenerateTableReportWithContext(ctx, driftResults, options)
 	case "html":
-		return g.GenerateHTMLReport(ctx, driftResults, options)
+		return g.GenerateHTMLReportWithContext(ctx, driftResults, options)
 	case "markdown", "md":
-		return g.GenerateMarkdownReport(ctx, driftResults, options)
+		return g.GenerateMarkdownReportWithContext(ctx, driftResults, options)
 	default:
 		return nil, fmt.Errorf("unsupported custom format: %s", format)
 	}
+}
+
+// Interface adapter methods to implement interfaces.ReportGenerator
+
+// GenerateJSONReport adapter for interface compatibility
+func (g *ConcreteReportGenerator) GenerateJSONReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
+	return g.GenerateJSONReportWithContext(context.Background(), results, nil)
+}
+
+// GenerateYAMLReport adapter for interface compatibility
+func (g *ConcreteReportGenerator) GenerateYAMLReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
+	return g.GenerateYAMLReportWithContext(context.Background(), results, nil)
+}
+
+// GenerateTableReport adapter for interface compatibility
+func (g *ConcreteReportGenerator) GenerateTableReport(results map[string]*interfaces.DriftResult) (string, error) {
+	bytes, err := g.GenerateTableReportWithContext(context.Background(), results, nil)
+	return string(bytes), err
+}
+
+// GenerateHTMLReport adapter for interface compatibility
+func (g *ConcreteReportGenerator) GenerateHTMLReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
+	return g.GenerateHTMLReportWithContext(context.Background(), results, nil)
+}
+
+// GenerateMarkdownReport adapter for interface compatibility
+func (g *ConcreteReportGenerator) GenerateMarkdownReport(results map[string]*interfaces.DriftResult) ([]byte, error) {
+	return g.GenerateMarkdownReportWithContext(context.Background(), results, nil)
+}
+
+// WriteReport adapter for interface compatibility
+func (g *ConcreteReportGenerator) WriteReport(results map[string]*interfaces.DriftResult, format string, writer io.Writer) error {
+	var content []byte
+	var err error
+	
+	switch strings.ToLower(format) {
+	case "json":
+		content, err = g.GenerateJSONReport(results)
+	case "yaml", "yml":
+		content, err = g.GenerateYAMLReport(results)
+	case "html":
+		content, err = g.GenerateHTMLReport(results)
+	case "markdown", "md":
+		content, err = g.GenerateMarkdownReport(results)
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+	
+	if err != nil {
+		return err
+	}
+	
+	_, err = writer.Write(content)
+	return err
 }
 
 // ReportWriter implementation methods

@@ -168,7 +168,7 @@ func TestConcreteReportGenerator_GenerateJSONReport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := generator.GenerateJSONReport(context.Background(), tt.driftResults, tt.options)
+			result, err := generator.GenerateJSONReport(tt.driftResults)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)
@@ -211,7 +211,7 @@ func TestConcreteReportGenerator_GenerateYAMLReport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := generator.GenerateYAMLReport(context.Background(), tt.driftResults, tt.options)
+			result, err := generator.GenerateYAMLReport(tt.driftResults)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)
@@ -234,10 +234,10 @@ func TestConcreteReportGenerator_GenerateTableReport(t *testing.T) {
 	generator := NewConcreteReportGenerator(logger)
 	driftResults := createTestDriftResults()
 
-	result, err := generator.GenerateTableReport(context.Background(), driftResults, map[string]interface{}{})
+	result, err := generator.GenerateTableReport(driftResults)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
-	assert.Nil(t, result)
+	assert.Equal(t, "", result)
 }
 
 func TestConcreteReportGenerator_GenerateHTMLReport(t *testing.T) {
@@ -245,7 +245,7 @@ func TestConcreteReportGenerator_GenerateHTMLReport(t *testing.T) {
 	generator := NewConcreteReportGenerator(logger)
 	driftResults := createTestDriftResults()
 
-	result, err := generator.GenerateHTMLReport(context.Background(), driftResults, map[string]interface{}{})
+	result, err := generator.GenerateHTMLReport(driftResults)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 	assert.Nil(t, result)
@@ -256,7 +256,7 @@ func TestConcreteReportGenerator_GenerateMarkdownReport(t *testing.T) {
 	generator := NewConcreteReportGenerator(logger)
 	driftResults := createTestDriftResults()
 
-	result, err := generator.GenerateMarkdownReport(context.Background(), driftResults, map[string]interface{}{})
+	result, err := generator.GenerateMarkdownReport(driftResults)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not implemented")
 	assert.Nil(t, result)

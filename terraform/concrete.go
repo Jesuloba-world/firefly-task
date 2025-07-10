@@ -72,26 +72,24 @@ func NewConcreteTerraformStateManager(statePath string, logger *logrus.Logger) i
 // ParseTerraformState parses a Terraform state file and returns the configuration
 func (p *ConcreteTerraformParser) ParseTerraformState(filePath string) (map[string]*interfaces.TerraformConfig, error) {
 	p.logger.Debugf("ConcreteTerraformParser: Parsing state file %s", filePath)
-	return p.parser.ParseState(filePath)
+	return p.parser.ParseTerraformState(filePath)
 }
 
 func (p *ConcreteTerraformParser) ParseTerraformHCL(dirPath string) (map[string]*interfaces.TerraformConfig, error) {
 	p.logger.Debugf("ConcreteTerraformParser: Parsing HCL files in %s", dirPath)
-	return p.parser.ParseHCL(dirPath)
+	return p.parser.ParseTerraformHCL(dirPath)
 }
 
 // ValidateStateFile validates that the state file is valid and readable
 func (p *ConcreteTerraformParser) ValidateStateFile(filePath string) error {
 	p.logger.Debugf("ConcreteTerraformParser: Validating state file %s", filePath)
-	// Placeholder implementation
-	return nil
+	return p.parser.ValidateStateFile(filePath)
 }
 
 // ValidateHCLDirectory validates that the HCL directory contains valid Terraform files
 func (p *ConcreteTerraformParser) ValidateHCLDirectory(dirPath string) error {
 	p.logger.Debugf("ConcreteTerraformParser: Validating HCL directory %s", dirPath)
-	// Placeholder implementation
-	return nil
+	return p.parser.ValidateHCLDirectory(dirPath)
 }
 
 // ParsePlanFile parses a Terraform plan file and returns configurations
