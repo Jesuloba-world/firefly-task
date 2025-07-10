@@ -81,8 +81,6 @@ func (a *Application) Shutdown() {
 	log.Println("Application shutdown complete")
 }
 
-
-
 // Wait blocks until the application context is cancelled
 func (a *Application) Wait() {
 	<-a.ctx.Done()

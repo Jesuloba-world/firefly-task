@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-
+	"strings"
 
 	"github.com/spf13/cobra"
+	"firefly-task/pkg/logging"
 )
 
 // CommandHandler handles all CLI commands for the application
@@ -26,7 +27,28 @@ func (h *CommandHandler) CreateRootCommand() *cobra.Command {
 		Short: "A tool for detecting drift in EC2 instances",
 		Long: `Firefly Task is a CLI tool that helps detect configuration drift
 between actual EC2 instances and their Terraform configurations.`,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Get logging configuration from flags
+			logLevel, _ := cmd.Flags().GetString("log-level")
+			logJSON, _ := cmd.Flags().GetBool("log-json")
+			isProduction := strings.ToLower(os.Getenv("ENVIRONMENT")) == "production"
+			
+			// Initialize logger with flag values
+			logging.InitLogger(logLevel, isProduction)
+			logger := logging.GetLogger()
+			
+			logger.Debugw("Logger initialized",
+				"log_level", logLevel,
+				"log_json", logJSON,
+				"is_production", isProduction)
+			
+			return nil
+		},
 	}
+
+	// Add persistent flags for logging configuration
+	rootCmd.PersistentFlags().String("log-level", "info", "Set log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().Bool("log-json", false, "Output logs in JSON format")
 
 	// Add subcommands
 	rootCmd.AddCommand(h.CreateCheckCommand())
@@ -119,8 +141,18 @@ func (h *CommandHandler) CreateAttributeCommand() *cobra.Command {
 
 // handleCheckCommand handles the check command execution
 func (h *CommandHandler) handleCheckCommand(ctx context.Context, instanceID, terraformPath, outputFile string, attributes []string) error {
+	logger := logging.GetLogger()
+	
+	logger.Infow("Starting drift detection",
+		"instance_id", instanceID,
+		"terraform_path", terraformPath,
+		"output_file", outputFile,
+		"attributes", attributes)
+
 	// Start the application
 	if err := h.app.Start(); err != nil {
+		logger.Errorw("Failed to start application",
+			"error", err.Error())
 		return fmt.Errorf("failed to start application: %w", err)
 	}
 	defer h.app.Shutdown()
@@ -128,17 +160,39 @@ func (h *CommandHandler) handleCheckCommand(ctx context.Context, instanceID, ter
 	// Run single check
 	reportData, err := h.app.RunSingleCheck(ctx, instanceID, terraformPath, attributes)
 	if err != nil {
-		return err
+		logger.Errorw("Drift detection failed",
+			"instance_id", instanceID,
+			"error", err.Error())
+		return fmt.Errorf("failed to check drift for instance %s: %w", instanceID, err)
 	}
 
+	logger.Infow("Drift detection completed successfully",
+		"instance_id", instanceID,
+		"data_size", len(reportData))
+
 	// Output result
-	return h.outputResult(reportData, outputFile)
+	err = h.outputResult(reportData, outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to output result for instance %s: %w", instanceID, err)
+	}
+
+	return nil
 }
 
 // handleBatchCommand handles the batch command execution
 func (h *CommandHandler) handleBatchCommand(ctx context.Context, inputFile, terraformPath, outputFile string, attributes []string) error {
+	logger := logging.GetLogger()
+	
+	logger.Infow("Starting batch drift detection",
+		"input_file", inputFile,
+		"terraform_path", terraformPath,
+		"output_file", outputFile,
+		"attributes", attributes)
+
 	// Start the application
 	if err := h.app.Start(); err != nil {
+		logger.Errorw("Failed to start application for batch check",
+			"error", err.Error())
 		return fmt.Errorf("failed to start application: %w", err)
 	}
 	defer h.app.Shutdown()
@@ -146,17 +200,39 @@ func (h *CommandHandler) handleBatchCommand(ctx context.Context, inputFile, terr
 	// Run batch check
 	reportData, err := h.app.RunBatchCheck(ctx, inputFile, terraformPath, attributes)
 	if err != nil {
-		return err
+		logger.Errorw("Batch drift detection failed",
+			"input_file", inputFile,
+			"error", err.Error())
+		return fmt.Errorf("failed to run batch check with input file %s: %w", inputFile, err)
 	}
 
+	logger.Infow("Batch drift detection completed successfully",
+		"input_file", inputFile,
+		"data_size", len(reportData))
+
 	// Output result
-	return h.outputResult(reportData, outputFile)
+	err = h.outputResult(reportData, outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to output batch result: %w", err)
+	}
+
+	return nil
 }
 
 // handleAttributeCommand handles the attribute command execution
 func (h *CommandHandler) handleAttributeCommand(ctx context.Context, instanceID, terraformPath, attribute, outputFile string) error {
+	logger := logging.GetLogger()
+	
+	logger.Infow("Starting attribute drift detection",
+		"instance_id", instanceID,
+		"terraform_path", terraformPath,
+		"output_file", outputFile,
+		"attribute", attribute)
+
 	// Start the application
 	if err := h.app.Start(); err != nil {
+		logger.Errorw("Failed to start application for attribute check",
+			"error", err.Error())
 		return fmt.Errorf("failed to start application: %w", err)
 	}
 	defer h.app.Shutdown()
@@ -164,25 +240,51 @@ func (h *CommandHandler) handleAttributeCommand(ctx context.Context, instanceID,
 	// Run attribute check
 	reportData, err := h.app.RunAttributeCheck(ctx, instanceID, terraformPath, attribute)
 	if err != nil {
-		return err
+		logger.Errorw("Attribute drift detection failed",
+			"instance_id", instanceID,
+			"attribute", attribute,
+			"error", err.Error())
+		return fmt.Errorf("failed to run attribute check for instance %s: %w", instanceID, err)
 	}
+
+	logger.Infow("Attribute drift detection completed successfully",
+		"instance_id", instanceID,
+		"attribute", attribute,
+		"data_size", len(reportData))
 
 	// Output result
-	return h.outputResult(reportData, outputFile)
+	err = h.outputResult(reportData, outputFile)
+	if err != nil {
+		return fmt.Errorf("failed to output attribute result for instance %s: %w", instanceID, err)
+	}
+
+	return nil
 }
 
-// outputResult outputs the result to file or stdout
+// outputResult outputs the result to file or stdout based on the output parameter
 func (h *CommandHandler) outputResult(data []byte, outputFile string) error {
+	logger := logging.GetLogger()
+	
 	if outputFile != "" {
-		// Write to file
-		if err := os.WriteFile(outputFile, data, 0644); err != nil {
-			return fmt.Errorf("failed to write output file: %w", err)
+		logger.Infow("Writing result to file", 
+			"file", outputFile,
+			"data_size", len(data))
+		
+		err := os.WriteFile(outputFile, data, 0644)
+		if err != nil {
+			logger.Errorw("Failed to write result to file",
+				"file", outputFile,
+				"error", err.Error())
+			return fmt.Errorf("failed to write result to file %s: %w", outputFile, err)
 		}
-		fmt.Printf("Report written to %s\n", outputFile)
-	} else {
-		// Print to stdout
-		fmt.Print(string(data))
+		
+		logger.Infow("Successfully wrote result to file", "file", outputFile)
+		return nil
 	}
+
+	// Output to stdout
+	logger.Debugw("Writing result to stdout", "data_size", len(data))
+	fmt.Print(string(data))
 	return nil
 }
 

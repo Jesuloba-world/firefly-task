@@ -6,7 +6,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"firefly-task/drift"
-	"firefly-task/logging"
 	"firefly-task/pkg/interfaces"
 	"firefly-task/report"
 	"firefly-task/terraform"
@@ -48,8 +47,9 @@ func (s *StubEC2Client) ListEC2Instances(ctx context.Context) ([]*interfaces.EC2
 // RegisterDefaults registers the default services in the container
 func (c *Container) RegisterDefaults() error {
 	c.RegisterFactory("logger", func() interface{} {
-		logger, _ := logging.NewLogger(logging.DefaultLogConfig())
-		return logger.Logger // Return the underlying *logrus.Logger
+		logger := logrus.New()
+		logger.SetLevel(logrus.InfoLevel)
+		return logger
 	})
 
 	c.RegisterFactory("ec2Client", func() interface{} {

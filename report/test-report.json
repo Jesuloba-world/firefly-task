@@ -9,7 +9,7 @@
       "low": 1,
       "medium": 1
     },
-    "generation_time": "2025-07-10T02:25:48+01:00",
+    "generation_time": "2025-07-10T03:17:02+01:00",
     "overall_status": "DRIFT_DETECTED",
     "highest_severity": "high"
   },
@@ -18,7 +18,7 @@
       "resource_id": "i-fedcba9876543210",
       "resource_type": "aws_db_instance",
       "is_drifted": false,
-      "detection_time": "2025-07-10T02:25:48.7267603+01:00",
+      "detection_time": "2025-07-10T03:17:02.7704483+01:00",
       "drift_details": [],
       "severity": "low"
     },
@@ -26,7 +26,7 @@
       "resource_id": "i-1234567890abcdef0",
       "resource_type": "aws_instance",
       "is_drifted": true,
-      "detection_time": "2025-07-10T02:25:48.7267603+01:00",
+      "detection_time": "2025-07-10T03:17:02.7704483+01:00",
       "drift_details": [
         {
           "attribute": "instance_type",
@@ -42,7 +42,7 @@
       "resource_id": "i-abcdef1234567890",
       "resource_type": "aws_instance",
       "is_drifted": true,
-      "detection_time": "2025-07-10T02:25:48.7267603+01:00",
+      "detection_time": "2025-07-10T03:17:02.7704483+01:00",
       "drift_details": [
         {
           "attribute": "security_groups",
@@ -58,7 +58,7 @@
       "resource_id": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188",
       "resource_type": "aws_lb",
       "is_drifted": true,
-      "detection_time": "2025-07-10T02:25:48.7267603+01:00",
+      "detection_time": "2025-07-10T03:17:02.7704483+01:00",
       "drift_details": [
         {
           "attribute": "publicly_accessible",
@@ -75,5 +75,5 @@
     "generator_version": "1.0.0",
     "report_format": "standard"
   },
-  "timestamp": "2025-07-10T02:25:48+01:00"
+  "timestamp": "2025-07-10T03:17:02+01:00"
 }

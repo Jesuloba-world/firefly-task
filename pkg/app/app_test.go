@@ -11,6 +11,7 @@ import (
 
 	"firefly-task/config"
 	"firefly-task/pkg/interfaces"
+	"firefly-task/pkg/logging"
 )
 
 // Mock implementations for testing
@@ -137,12 +138,17 @@ func TestNew(t *testing.T) {
 	mockReport := &MockReportGenerator{}
 	cfg := &config.Config{}
 	cfg.SetDefaults()
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	assert.NotNil(t, app)
 	assert.NotNil(t, app.config)
 	assert.NotNil(t, app.ctx)
+	assert.NotNil(t, app.logger)
 }
 
 func TestApplication_RunSingleInstanceCheck(t *testing.T) {
@@ -152,8 +158,12 @@ func TestApplication_RunSingleInstanceCheck(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	ctx := context.Background()
 	instanceID := "i-1234567890abcdef0"
@@ -180,9 +190,9 @@ func TestApplication_RunSingleInstanceCheck(t *testing.T) {
 
 	// Mock drift result
 	driftResult := &interfaces.DriftResult{
-		ResourceID:     instanceID,
-		ResourceType:   "aws_instance",
-		IsDrifted:      true,
+		ResourceID:   instanceID,
+		ResourceType: "aws_instance",
+		IsDrifted:    true,
 		DriftDetails: []*interfaces.DriftDetail{
 			{
 				Attribute:     "instance_type",
@@ -191,8 +201,8 @@ func TestApplication_RunSingleInstanceCheck(t *testing.T) {
 				Severity:      interfaces.SeverityMedium,
 			},
 		},
-		Severity:       interfaces.SeverityMedium,
-		DetectionTime:  time.Now(),
+		Severity:      interfaces.SeverityMedium,
+		DetectionTime: time.Now(),
 	}
 
 	// Set up mocks
@@ -218,14 +228,17 @@ func TestApplication_RunBatchInstanceCheck(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	ctx := context.Background()
 	instanceIDs := []string{"i-1234567890abcdef0", "i-0987654321fedcba0"}
 	terraformPath := "/path/to/terraform"
 	attributes := []string{"instance_type", "state"}
-
 
 	// Mock EC2 instances
 	ec2Instances := map[string]*interfaces.EC2Instance{
@@ -266,17 +279,17 @@ func TestApplication_RunBatchInstanceCheck(t *testing.T) {
 	// Mock drift results
 	driftResults := map[string]*interfaces.DriftResult{
 		"i-1234567890abcdef0": {
-			ResourceID:     "i-1234567890abcdef0",
-			ResourceType:   "aws_instance",
-			IsDrifted:      false,
-			DriftDetails:   []*interfaces.DriftDetail{},
-			Severity:       interfaces.SeverityNone,
-			DetectionTime:  time.Now(),
+			ResourceID:    "i-1234567890abcdef0",
+			ResourceType:  "aws_instance",
+			IsDrifted:     false,
+			DriftDetails:  []*interfaces.DriftDetail{},
+			Severity:      interfaces.SeverityNone,
+			DetectionTime: time.Now(),
 		},
 		"i-0987654321fedcba0": {
-			ResourceID:     "i-0987654321fedcba0",
-			ResourceType:   "aws_instance",
-			IsDrifted:      true,
+			ResourceID:   "i-0987654321fedcba0",
+			ResourceType: "aws_instance",
+			IsDrifted:    true,
 			DriftDetails: []*interfaces.DriftDetail{
 				{
 					Attribute:     "state",
@@ -285,8 +298,8 @@ func TestApplication_RunBatchInstanceCheck(t *testing.T) {
 					Severity:      interfaces.SeverityHigh,
 				},
 			},
-			Severity:       interfaces.SeverityHigh,
-			DetectionTime:  time.Now(),
+			Severity:      interfaces.SeverityHigh,
+			DetectionTime: time.Now(),
 		},
 	}
 
@@ -317,17 +330,21 @@ func TestApplication_GenerateReport(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	driftResults := map[string]*interfaces.DriftResult{
 		"i-1234567890abcdef0": {
-			ResourceID:     "i-1234567890abcdef0",
-			ResourceType:   "aws_instance",
-			IsDrifted:      true,
-			DriftDetails:   []*interfaces.DriftDetail{},
-			Severity:       interfaces.SeverityMedium,
-			DetectionTime:  time.Now(),
+			ResourceID:    "i-1234567890abcdef0",
+			ResourceType:  "aws_instance",
+			IsDrifted:     true,
+			DriftDetails:  []*interfaces.DriftDetail{},
+			Severity:      interfaces.SeverityMedium,
+			DetectionTime: time.Now(),
 		},
 	}
 
@@ -373,8 +390,12 @@ func TestApplication_Lifecycle(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	// Test Start
 	err := app.Start()

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"firefly-task/config"
+	"firefly-task/pkg/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,8 +18,12 @@ func TestApplication_Start(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	// Test successful start
 	err := app.Start()
@@ -41,8 +46,12 @@ func TestApplication_Shutdown(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	// Start the application
 	err := app.Start()
@@ -65,8 +74,12 @@ func TestApplication_Wait(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	err := app.Start()
 	assert.NoError(t, err)
@@ -95,7 +108,12 @@ func TestApplication_WaitWithTimeout(t *testing.T) {
 		mockTF := &MockTerraformParser{}
 		mockDrift := &MockDriftDetector{}
 		mockReport := &MockReportGenerator{}
-		app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+		
+		// Initialize logger for testing
+		logging.InitLogger("debug", false)
+		logger := logging.GetLogger()
+		
+		app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 		err := app.Start()
 		assert.NoError(t, err)
 
@@ -118,7 +136,12 @@ func TestApplication_WaitWithTimeout(t *testing.T) {
 		mockTF := &MockTerraformParser{}
 		mockDrift := &MockDriftDetector{}
 		mockReport := &MockReportGenerator{}
-		app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+		
+		// Initialize logger for testing
+		logging.InitLogger("debug", false)
+		logger := logging.GetLogger()
+		
+		app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 		err := app.Start()
 		assert.NoError(t, err)
 
@@ -147,8 +170,12 @@ func TestApplication_SignalHandling(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	err := app.Start()
 	assert.NoError(t, err)
@@ -177,8 +204,12 @@ func TestApplication_ShutdownTimeout(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	err := app.Start()
 	assert.NoError(t, err)
@@ -199,8 +230,12 @@ func TestApplication_ConcurrentOperations(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	err := app.Start()
 	assert.NoError(t, err)
@@ -241,8 +276,12 @@ func TestApplication_ContextCancellation(t *testing.T) {
 	mockTF := &MockTerraformParser{}
 	mockDrift := &MockDriftDetector{}
 	mockReport := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport)
+	app := New(cfg, mockEC2, mockTF, mockDrift, mockReport, logger)
 
 	err := app.Start()
 	assert.NoError(t, err)

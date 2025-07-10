@@ -11,6 +11,8 @@ import (
 	"firefly-task/config"
 	"firefly-task/pkg/container"
 	"firefly-task/pkg/interfaces"
+	"firefly-task/pkg/logging"
+	"go.uber.org/zap"
 )
 
 // Default attributes to check for drift detection
@@ -23,6 +25,7 @@ type Application struct {
 	terraformParser interfaces.TerraformParser
 	driftDetector   interfaces.DriftDetector
 	reportGenerator interfaces.ReportGenerator
+	logger          *zap.SugaredLogger
 
 	// Configuration
 	config *config.Config
@@ -38,7 +41,7 @@ type Application struct {
 
 // New creates a new application instance with the provided dependencies
 func New(cfg *config.Config, awsClient interfaces.EC2Client, terraformParser interfaces.TerraformParser,
-	driftDetector interfaces.DriftDetector, reportGenerator interfaces.ReportGenerator) *Application {
+	driftDetector interfaces.DriftDetector, reportGenerator interfaces.ReportGenerator, logger *zap.SugaredLogger) *Application {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Application{
 		config:          cfg,
@@ -46,6 +49,7 @@ func New(cfg *config.Config, awsClient interfaces.EC2Client, terraformParser int
 		terraformParser: terraformParser,
 		driftDetector:   driftDetector,
 		reportGenerator: reportGenerator,
+		logger:          logger,
 		ctx:             ctx,
 		cancelFunc:      cancel,
 	}
@@ -80,14 +84,27 @@ func NewFromContainer(cfg *config.Config) (*Application, error) {
 		return nil, fmt.Errorf("failed to get report generator: %w", err)
 	}
 
+	// Get or create logger instance
+	logger := logging.GetLogger()
+	if logger == nil {
+		// Initialize with default settings if not already initialized
+		logging.InitLogger("info", false)
+		logger = logging.GetLogger()
+	}
+
 	// Create application instance
-	return New(cfg, ec2Client, tfParser, driftDetector, reportGenerator), nil
+	return New(cfg, ec2Client, tfParser, driftDetector, reportGenerator, logger), nil
 }
 
 // ReadInstanceIDsFromFile reads instance IDs from a file
 func (a *Application) ReadInstanceIDsFromFile(filename string) ([]string, error) {
+	a.logger.Debugw("Reading instance IDs from file", "filename", filename)
+	
 	file, err := os.Open(filename)
 	if err != nil {
+		a.logger.Errorw("Failed to open instance IDs file", 
+			"filename", filename, 
+			"error", err.Error())
 		return nil, fmt.Errorf("failed to open file %s: %w", filename, err)
 	}
 	defer file.Close()
@@ -102,9 +119,15 @@ func (a *Application) ReadInstanceIDsFromFile(filename string) ([]string, error)
 	}
 
 	if err := scanner.Err(); err != nil {
+		a.logger.Errorw("Error reading instance IDs file", 
+			"filename", filename, 
+			"error", err.Error())
 		return nil, fmt.Errorf("error reading file %s: %w", filename, err)
 	}
 
+	a.logger.Infow("Successfully read instance IDs from file", 
+		"filename", filename, 
+		"count", len(instanceIDs))
 	return instanceIDs, nil
 }
 
@@ -168,9 +191,9 @@ func (a *Application) RunSingleCheck(ctx context.Context, instanceID, terraformP
 
 	// Generate report
 	reportData, err := a.GenerateReport(
-			map[string]*interfaces.DriftResult{instanceID: driftResult},
-			a.config.Output,
-		)
+		map[string]*interfaces.DriftResult{instanceID: driftResult},
+		a.config.Output,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report: %w", err)
 	}
@@ -230,9 +253,9 @@ func (a *Application) RunAttributeCheck(ctx context.Context, instanceID, terrafo
 
 	// Generate report
 	reportData, err := a.GenerateReport(
-			map[string]*interfaces.DriftResult{instanceID: driftResult},
-			a.config.Output,
-		)
+		map[string]*interfaces.DriftResult{instanceID: driftResult},
+		a.config.Output,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report: %w", err)
 	}
@@ -337,4 +360,9 @@ func (a *Application) Context() context.Context {
 // Config returns the application configuration
 func (a *Application) Config() *config.Config {
 	return a.config
+}
+
+// Logger returns the application logger
+func (a *Application) Logger() *zap.SugaredLogger {
+	return a.logger
 }

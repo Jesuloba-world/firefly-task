@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"firefly-task/config"
+	"firefly-task/pkg/logging"
 )
 
 func TestNewCommandHandler(t *testing.T) {
@@ -17,8 +18,12 @@ func TestNewCommandHandler(t *testing.T) {
 	mockTerraformParser := &MockTerraformParser{}
 	mockDriftDetector := &MockDriftDetector{}
 	mockReportGenerator := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator)
+	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator, logger)
 
 	// Create command handler
 	handler := NewCommandHandler(app)
@@ -40,8 +45,12 @@ func TestCreateRootCommand(t *testing.T) {
 	mockTerraformParser := &MockTerraformParser{}
 	mockDriftDetector := &MockDriftDetector{}
 	mockReportGenerator := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator)
+	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator, logger)
 	handler := NewCommandHandler(app)
 
 	// Create root command
@@ -89,8 +98,12 @@ func TestCreateCheckCommand(t *testing.T) {
 	mockTerraformParser := &MockTerraformParser{}
 	mockDriftDetector := &MockDriftDetector{}
 	mockReportGenerator := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator)
+	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator, logger)
 	handler := NewCommandHandler(app)
 
 	// Create check command
@@ -132,8 +145,12 @@ func TestCreateBatchCommand(t *testing.T) {
 	mockTerraformParser := &MockTerraformParser{}
 	mockDriftDetector := &MockDriftDetector{}
 	mockReportGenerator := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator)
+	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator, logger)
 	handler := NewCommandHandler(app)
 
 	// Create batch command
@@ -175,8 +192,12 @@ func TestCreateAttributeCommand(t *testing.T) {
 	mockTerraformParser := &MockTerraformParser{}
 	mockDriftDetector := &MockDriftDetector{}
 	mockReportGenerator := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator)
+	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator, logger)
 	handler := NewCommandHandler(app)
 
 	// Create attribute command
@@ -218,8 +239,12 @@ func TestOutputResult(t *testing.T) {
 	mockTerraformParser := &MockTerraformParser{}
 	mockDriftDetector := &MockDriftDetector{}
 	mockReportGenerator := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator)
+	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator, logger)
 	handler := NewCommandHandler(app)
 
 	testData := []byte("test report data")
@@ -277,8 +302,12 @@ func TestExecuteCommand(t *testing.T) {
 	mockTerraformParser := &MockTerraformParser{}
 	mockDriftDetector := &MockDriftDetector{}
 	mockReportGenerator := &MockReportGenerator{}
+	
+	// Initialize logger for testing
+	logging.InitLogger("debug", false)
+	logger := logging.GetLogger()
 
-	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator)
+	app := New(cfg, mockAWSClient, mockTerraformParser, mockDriftDetector, mockReportGenerator, logger)
 	handler := NewCommandHandler(app)
 
 	t.Run("Help command", func(t *testing.T) {

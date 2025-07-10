@@ -47,17 +47,17 @@ func NormalizePath(path string) string {
 	if path == "" {
 		return path
 	}
-	
+
 	// Convert forward slashes to backslashes on Windows
 	normalized := filepath.Clean(path)
-	
+
 	// Handle relative paths
 	if !filepath.IsAbs(normalized) {
 		if wd, err := os.Getwd(); err == nil {
 			normalized = filepath.Join(wd, normalized)
 		}
 	}
-	
+
 	return normalized
 }
 
@@ -67,7 +67,7 @@ func (c *Config) ValidateConfig() error {
 	if err := ValidateOutputFormat(c.Output); err != nil {
 		return err
 	}
-	
+
 	// Validate concurrency
 	if c.Concurrency < 1 {
 		c.Concurrency = 1 // Default to 1 if not set or invalid
@@ -75,7 +75,7 @@ func (c *Config) ValidateConfig() error {
 	if c.Concurrency > 50 {
 		return fmt.Errorf("concurrency cannot exceed 50, got %d", c.Concurrency)
 	}
-	
+
 	// Normalize paths
 	if c.TerraformPath != "" {
 		c.TerraformPath = NormalizePath(c.TerraformPath)
@@ -83,7 +83,7 @@ func (c *Config) ValidateConfig() error {
 	if c.InputFile != "" {
 		c.InputFile = NormalizePath(c.InputFile)
 	}
-	
+
 	return nil
 }
 
@@ -115,7 +115,7 @@ func (c *Config) SetDefaults() {
 	if c.Concurrency == 0 {
 		c.Concurrency = 5
 	}
-	
+
 	// Get AWS settings from environment
 	c.GetAWSRegionFromEnv()
 	c.GetAWSProfileFromEnv()
@@ -124,7 +124,7 @@ func (c *Config) SetDefaults() {
 // String returns a string representation of the config (for debugging)
 func (c *Config) String() string {
 	var parts []string
-	
+
 	if c.AWSProfile != "" {
 		parts = append(parts, fmt.Sprintf("AWS Profile: %s", c.AWSProfile))
 	}
@@ -133,7 +133,7 @@ func (c *Config) String() string {
 	}
 	parts = append(parts, fmt.Sprintf("Output: %s", c.Output))
 	parts = append(parts, fmt.Sprintf("Verbose: %t", c.Verbose))
-	
+
 	if c.TerraformPath != "" {
 		parts = append(parts, fmt.Sprintf("Terraform Path: %s", c.TerraformPath))
 	}
@@ -147,7 +147,7 @@ func (c *Config) String() string {
 		parts = append(parts, fmt.Sprintf("Attribute: %s", c.Attribute))
 	}
 	parts = append(parts, fmt.Sprintf("Concurrency: %d", c.Concurrency))
-	
+
 	return strings.Join(parts, ", ")
 }
 
